@@ -20,17 +20,11 @@
 #
 
 import logging
-import xmlrpclib
-from openerp import models, fields
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.unit.mapper import (mapping,
-                                                  ImportMapper
-                                                  )
-from openerp.addons.connector.exception import IDMissingInBackend
-from ..unit.backend_adapter import (GenericAdapter)
-from ..unit.import_synchronizer import (DelayedBatchImporter, WooImporter)
-from ..connector import get_environment
-from ..backend import woo
+
+from odoo.addons.component.core import AbstractComponent, Component
+from odoo.addons.connector.components.mapper import mapping
+
+from odoo import models, fields
 
 _logger = logging.getLogger(__name__)
 
@@ -55,21 +49,11 @@ class WooResPartner(models.Model):
     )
 
 
-@woo
-class CustomerAdapter(GenericAdapter):
-    _model_name = 'woo.res.partner'
+class CustomerAdapter(Component):
+    _inherit = ['woo.adapter']
+    _name = 'woo.customer.adapter'
+    _apply_on = 'woo.res.partner'
     _woo_model = 'customers'
-
-    def _call(self, method, arguments):
-        try:
-            return super(CustomerAdapter, self)._call(method, arguments)
-        except xmlrpclib.Fault as err:
-            # this is the error in the WooCommerce API
-            # when the customer does not exist
-            if err.faultCode == 102:
-                raise IDMissingInBackend
-            else:
-                raise
 
     def search(self, filters=None, from_date=None, to_date=None):
         """ Search records according to some criteria and return a
@@ -88,24 +72,23 @@ class CustomerAdapter(GenericAdapter):
         if to_date is not None:
             filters.setdefault('updated_at', {})
             filters['updated_at']['to'] = to_date.strftime(dt_fmt)
-        # the search method is on ol_customer instead of customer
-        return self._call('customers/list',
-                          [filters] if filters else [{}])
+
+        ids = []
+        r = self._call().get(self._woo_model)
+        for customer in r.json():
+            ids += [customer.get('id')]
+        return ids
 
 
-@woo
-class CustomerBatchImporter(DelayedBatchImporter):
+class CustomerBatchImporter(Component):
 
     """ Import the WooCommerce Partners.
 
     For every partner in the list, a delayed job is created.
     """
-    _model_name = ['woo.res.partner']
-
-    def _import_record(self, woo_id, priority=None):
-        """ Delay a job for the import """
-        super(CustomerBatchImporter, self)._import_record(
-            woo_id, priority=priority)
+    _inherit = ['woo.delayed.batch.importer']
+    _name = 'woo.customer.batch.importer'
+    _apply_on = ['woo.res.partner']
 
     def run(self, filters=None):
         """ Run the synchronization """
@@ -116,38 +99,22 @@ class CustomerBatchImporter(DelayedBatchImporter):
             from_date=from_date,
             to_date=to_date,
         )
-#         record_ids = self.env['wc.backend'].get_customer_ids(record_ids)
         _logger.info('search for woo partners %s returned %s',
                      filters, record_ids)
         for record_id in record_ids:
             self._import_record(record_id, 40)
 
 
-CustomerBatchImporter = CustomerBatchImporter  # deprecated
+class CustomerImporter(Component):
+    _name = 'woo.customer.importer'
+    _inherit = ['woo.importer']
+    _apply_on = ['woo.res.partner']
 
 
-@woo
-class CustomerImporter(WooImporter):
-    _model_name = ['woo.res.partner']
-
-    def _import_dependencies(self):
-        """ Import the dependencies for the record"""
-        return
-
-    def _create(self, data):
-        openerp_binding = super(CustomerImporter, self)._create(data)
-        return openerp_binding
-
-    def _after_import(self, binding):
-        """ Hook called at the end of the import """
-        return
-
-CustomerImport = CustomerImporter  # deprecated
-
-
-@woo
-class CustomerImportMapper(ImportMapper):
-    _model_name = 'woo.res.partner'
+class CustomerImportMapper(Component):
+    _name = 'woo.costomer.import.mapper'
+    _inherit = ['base.import.mapper']
+    _apply_on = 'woo.res.partner'
 
     @mapping
     def name(self, record):
@@ -219,11 +186,3 @@ class CustomerImportMapper(ImportMapper):
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
-
-
-@job(default_channel='root.woo')
-def customer_import_batch(session, model_name, backend_id, filters=None):
-    """ Prepare the import of Customer """
-    env = get_environment(session, model_name, backend_id)
-    importer = env.get_connector_unit(CustomerBatchImporter)
-    importer.run(filters=filters)

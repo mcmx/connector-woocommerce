@@ -20,17 +20,12 @@
 #
 
 import logging
-import xmlrpclib
-from openerp import models, fields, api
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.unit.mapper import (mapping,
-                                                  ImportMapper
-                                                  )
-from openerp.addons.connector.exception import IDMissingInBackend
-from ..unit.backend_adapter import (GenericAdapter)
-from ..unit.import_synchronizer import (DelayedBatchImporter, WooImporter)
-from ..connector import get_environment
-from ..backend import woo
+
+from odoo.addons.component.core import Component
+from odoo.addons.connector.components.mapper import mapping
+
+from odoo import models, fields, api
+
 _logger = logging.getLogger(__name__)
 
 
@@ -120,12 +115,13 @@ class SaleOrderLine(models.Model):
     )
 
 
-@woo
-class SaleOrderLineImportMapper(ImportMapper):
-    _model_name = 'woo.sale.order.line'
+class SaleOrderLineImportMapper(Component):
+    _name = 'woo.sale.line.import.mapper'
+    _inherit = ['base.import.mapper']
+    _apply_on = 'woo.sale.order.line'
 
     direct = [('quantity', 'product_uom_qty'),
-              ('quantity', 'product_uos_qty'),
+              # ('quantity', 'product_uos_qty'),
               ('name', 'name'),
               ('price', 'price_unit')
               ]
@@ -140,21 +136,11 @@ class SaleOrderLineImportMapper(ImportMapper):
         return {'product_id': product_id}
 
 
-@woo
-class SaleOrderAdapter(GenericAdapter):
-    _model_name = 'woo.sale.order'
+class SaleOrderAdapter(Component):
+    _name = 'woo.sale.adapter'
+    _inherit = ['woo.adapter']
+    _apply_on = 'woo.sale.order'
     _woo_model = 'orders'
-
-    def _call(self, method, arguments):
-        try:
-            return super(SaleOrderAdapter, self)._call(method, arguments)
-        except xmlrpclib.Fault as err:
-            # this is the error in the Woo API
-            # when the customer does not exist
-            if err.faultCode == 102:
-                raise IDMissingInBackend
-            else:
-                raise
 
     def search(self, filters=None, from_date=None, to_date=None):
         """ Search records according to some criteria and return a
@@ -174,23 +160,28 @@ class SaleOrderAdapter(GenericAdapter):
             filters.setdefault('updated_at', {})
             filters['updated_at']['to'] = to_date.strftime(dt_fmt)
 
-        return self._call('orders/list',
-                          [filters] if filters else [{}])
+        page = 0
+        ids = []
+        while True:
+            page += 1
+            r = self._call().get('%s?page=%s' % (self._woo_model, page))
+            if r.json():
+                for saleorder in r.json():
+                    ids += [saleorder.get('id')]
+            else:
+                break
+        return ids
 
 
-@woo
-class SaleOrderBatchImporter(DelayedBatchImporter):
+class SaleOrderBatchImporter(Component):
 
     """ Import the WooCommerce Partners.
 
     For every partner in the list, a delayed job is created.
     """
-    _model_name = ['woo.sale.order']
-
-    def _import_record(self, woo_id, priority=None):
-        """ Delay a job for the import """
-        super(SaleOrderBatchImporter, self)._import_record(
-            woo_id, priority=priority)
+    _inherit = ['woo.delayed.batch.importer']
+    _name = 'woo.sale.batch.importer'
+    _apply_on = ['woo.sale.order']
 
     def update_existing_order(self, woo_sale_order, record_id):
         """ Enter Your logic for Existing Sale Order """
@@ -198,7 +189,6 @@ class SaleOrderBatchImporter(DelayedBatchImporter):
 
     def run(self, filters=None):
         """ Run the synchronization """
-#
         from_date = filters.pop('from_date', None)
         to_date = filters.pop('to_date', None)
         record_ids = self.backend_adapter.search(
@@ -217,20 +207,16 @@ class SaleOrderBatchImporter(DelayedBatchImporter):
         _logger.info('search for woo partners %s returned %s',
                      filters, record_ids)
         for record_id in order_ids:
-            self._import_record(record_id, 50)
+            self._import_record(record_id, priority=50)
 
 
-SaleOrderBatchImporter = SaleOrderBatchImporter
-#
-
-
-@woo
-class SaleOrderImporter(WooImporter):
-    _model_name = ['woo.sale.order']
+class SaleOrderImporter(Component):
+    _name = 'woo.sale.importer'
+    _inherit = ['woo.importer']
+    _apply_on = ['woo.sale.order']
 
     def _import_addresses(self):
         record = self.woo_record
-        record = record['order']
         self._import_dependency(record['customer_id'],
                                 'woo.res.partner')
 
@@ -259,7 +245,7 @@ class SaleOrderImporter(WooImporter):
         top_items = []
 
         # Group the childs with their parent
-        for item in resource['order']['line_items']:
+        for item in resource['line_items']:
             if item.get('parent_item_id'):
                 child_items.setdefault(item['parent_item_id'], []).append(item)
             else:
@@ -271,14 +257,6 @@ class SaleOrderImporter(WooImporter):
         resource['items'] = all_items
         return resource
 
-    def _create(self, data):
-        openerp_binding = super(SaleOrderImporter, self)._create(data)
-        return openerp_binding
-
-    def _after_import(self, binding):
-        """ Hook called at the end of the import """
-        return
-
     def _get_woo_data(self):
         """ Return the raw WooCommerce data for ``self.woo_id`` """
         record = super(SaleOrderImporter, self)._get_woo_data()
@@ -286,20 +264,19 @@ class SaleOrderImporter(WooImporter):
         # product in a sale)
         record = self._clean_woo_items(record)
         return record
-SaleOrderImport = SaleOrderImporter
 
 
-@woo
-class SaleOrderImportMapper(ImportMapper):
-    _model_name = 'woo.sale.order'
+class SaleOrderImportMapper(Component):
+    _name = 'woo.sale.import.mapper'
+    _inherit = ['base.import.mapper']
+    _apply_on = 'woo.sale.order'
 
     children = [('items', 'woo_order_line_ids', 'woo.sale.order.line'),
                 ]
 
     @mapping
-    def status(self, record):
-        if record['order']:
-            rec = record['order']
+    def status(self, rec):
+        if rec:
             if rec['status']:
                 status_id = self.env['woo.sale.order.status'].search(
                     [('name', '=', rec['status'])])
@@ -314,14 +291,12 @@ class SaleOrderImportMapper(ImportMapper):
                 return {'status_id': False}
 
     @mapping
-    def customer_id(self, record):
-        if record['order']:
-            rec = record['order']
+    def customer_id(self, rec):
+        if rec:
             binder = self.binder_for('woo.res.partner')
             if rec['customer_id']:
                 partner_id = binder.to_openerp(rec['customer_id'],
                                                unwrap=True) or False
-#               customer_id = str(rec['customer_id'])
                 assert partner_id, ("Please Check Customer Role \
                                     in WooCommerce")
                 result = {'partner_id': partner_id}
@@ -329,7 +304,7 @@ class SaleOrderImportMapper(ImportMapper):
                     partner_id)
                 result.update(onchange_val['value'])
             else:
-                customer = rec['customer']['billing_address']
+                customer = rec['billing']
                 country_id = False
                 state_id = False
                 if customer['country']:
@@ -341,7 +316,7 @@ class SaleOrderImportMapper(ImportMapper):
                     state_id = self.env['res.country.state'].search(
                         [('code', '=', customer['state'])])
                     if state_id:
-                        state_id = state_id.id
+                        state_id = state_id.ids[0]  # Todo: 可能是个隐患。
                 name = customer['first_name'] + ' ' + customer['last_name']
                 partner_dict = {
                     'name': name,
@@ -356,22 +331,12 @@ class SaleOrderImportMapper(ImportMapper):
                     'backend_id': self.backend_record.id,
                     'openerp_id': partner_id.id,
                 })
-#                 woo_partner_id = self.env['woo.res.partner'].create(
-#                     partner_dict)
                 result = {'partner_id': partner_id.id}
-                onchange_val = self.env['sale.order'].onchange_partner_id(
-                    partner_id.id)
-                result.update(onchange_val['value'])
+                # Todo: 可能是个隐患。
+                # onchange_val = self.env['sale.order'].onchange_partner_id(partner_id.id)
+                # result.update(onchange_val['value'])
             return result
 
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
-
-
-@job(default_channel='root.woo')
-def sale_order_import_batch(session, model_name, backend_id, filters=None):
-    """ Prepare the import of Sale Order modified on Woo """
-    env = get_environment(session, model_name, backend_id)
-    importer = env.get_connector_unit(SaleOrderBatchImporter)
-    importer.run(filters=filters)

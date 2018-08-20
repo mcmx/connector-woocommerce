@@ -19,25 +19,9 @@
 #
 #
 
-from openerp import models, fields
-from openerp.addons.connector.connector import (ConnectorEnvironment,
-                                                install_in_connector)
-from openerp.addons.connector.checkpoint import checkpoint
+from odoo.addons.queue_job.job import job, related_action
 
-install_in_connector()
-
-
-def get_environment(session, model_name, backend_id):
-    """ Create an environment to work with.  """
-    backend_record = session.env['wc.backend'].browse(backend_id)
-    env = ConnectorEnvironment(backend_record, session, model_name)
-    lang = backend_record.default_lang_id
-    lang_code = lang.code if lang else 'en_US'
-    if lang_code == session.context.get('lang'):
-        return env
-    else:
-        with env.session.change_context(lang=lang_code):
-            return env
+from odoo import models, fields, api
 
 
 class WooBinding(models.AbstractModel):
@@ -67,19 +51,21 @@ class WooBinding(models.AbstractModel):
          'A binding already exists with the same Woo ID.'),
     ]
 
+    @job(default_channel='root.woo')
+    @api.model
+    def import_batch(self, backend, filters=None):
+        """ Prepare the import of records modified on WooCommerce """
+        if filters is None:
+            filters = {}
+        with backend.work_on(self._name) as work:
+            importer = work.component(usage='batch.importer')
+            return importer.run(filters=filters)
 
-def add_checkpoint(session, model_name, record_id, backend_id):
-    """ Add a row in the model ``connector.checkpoint`` for a record,
-    meaning it has to be reviewed by a user.
-
-    :param session: current session
-    :type session: :class:`openerp.addons.connector.session.ConnectorSession`
-    :param model_name: name of the model of the record to be reviewed
-    :type model_name: str
-    :param record_id: ID of the record to be reviewed
-    :type record_id: int
-    :param backend_id: ID of the WooCommerce Backend
-    :type backend_id: int
-    """
-    return checkpoint.add_checkpoint(session, model_name, record_id,
-                                     'wc.backend', backend_id)
+    @job(default_channel='root.woo')
+    @related_action(action='related_action_woo_link')
+    @api.model
+    def import_record(self, backend, external_id, force=False):
+        """ Import a WooCommerce record """
+        with backend.work_on(self._name) as work:
+            importer = work.component(usage='record.importer')
+            return importer.run(external_id, force=force)

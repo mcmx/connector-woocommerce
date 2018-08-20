@@ -66,7 +66,7 @@
 		</record>
 
 		<record model="ir.actions.act_window" id="act_open_wc_backend_view">
-			<field name="name">Backend</field>
+			<field name="name">WooCommerce</field>
 			<field name="type">ir.actions.act_window</field>
 			<field name="res_model">wc.backend</field>
 			<field name="view_type">form</field>
@@ -89,7 +89,7 @@
 			<field name="view_id" ref="view_wc_backend_tree" />
 		</record>
 
-		<menuitem id="menu_wc_backend" parent="connector.menu_queue"
+		<menuitem id="menu_wc_backend" parent="connector.menu_connector_root"
 			sequence="20" action="act_open_wc_backend_view" />
 	</data>
 </openerp>

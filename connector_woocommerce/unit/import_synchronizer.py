@@ -20,19 +20,22 @@
 #
 
 import logging
-from openerp import fields, _
-from openerp.addons.connector.queue.job import job, related_action
-from openerp.addons.connector.unit.synchronizer import Importer
-from openerp.addons.connector.exception import IDMissingInBackend
-from ..connector import get_environment
-from ..related_action import link
 from datetime import datetime
+
+from odoo.addons.component.core import AbstractComponent
+from odoo.addons.connector.exception import IDMissingInBackend
+
+from odoo import fields, _
+
 _logger = logging.getLogger(__name__)
 
 
-class WooImporter(Importer):
-
+class WooImporter(AbstractComponent):
     """ Base importer for WooCommerce """
+
+    _name = 'woo.importer'
+    _inherit = ['base.importer']
+    _usage = 'record.importer'
 
     def __init__(self, connector_env):
         """
@@ -103,10 +106,10 @@ class WooImporter(Importer):
         if not woo_id:
             return
         if importer_class is None:
-            importer_class = WooImporter
+            importer_class = self._usage
         binder = self.binder_for(binding_model)
         if always or binder.to_openerp(woo_id) is None:
-            importer = self.unit_for(importer_class, model=binding_model)
+            importer = self.component(usage=importer_class, model_name=binding_model)
             importer.run(woo_id)
 
     def _import_dependencies(self):
@@ -215,15 +218,16 @@ class WooImporter(Importer):
         self._after_import(binding)
 
 
-WooImportSynchronizer = WooImporter
-
-
-class BatchImporter(Importer):
+class BatchImporter(AbstractComponent):
 
     """ The role of a BatchImporter is to search for a list of
     items to import, then it can either import them directly or delay
     the import of each item separately.
     """
+    
+    _name = 'woo.batch.importer'
+    _usage = 'batch.importer'
+    _inherit = ['base.importer']
 
     def run(self, filters=None):
         """ Run the synchronization """
@@ -239,46 +243,38 @@ class BatchImporter(Importer):
         raise NotImplementedError
 
 
-BatchImportSynchronizer = BatchImporter
+# class DirectBatchImporter(BatchImporter):
+#
+#     """ Import the records directly, without delaying the jobs. """
+#     _model_name = None
+#
+#     def _import_record(self, record_id):
+#         """ Import the record directly """
+#         import_record(self.session,
+#                       self.model._name,
+#                       self.backend_record.id,
+#                       record_id)
+#
+#
+# DirectBatchImport = DirectBatchImporter
 
 
-class DirectBatchImporter(BatchImporter):
-
-    """ Import the records directly, without delaying the jobs. """
-    _model_name = None
-
-    def _import_record(self, record_id):
-        """ Import the record directly """
-        import_record(self.session,
-                      self.model._name,
-                      self.backend_record.id,
-                      record_id)
-
-
-DirectBatchImport = DirectBatchImporter
-
-
-class DelayedBatchImporter(BatchImporter):
+class DelayedBatchImporter(AbstractComponent):
 
     """ Delay import of the records """
-    _model_name = None
+    _inherit = 'woo.batch.importer'
+    _name = 'woo.delayed.batch.importer'
 
     def _import_record(self, record_id, **kwargs):
         """ Delay the import of the records"""
-        import_record.delay(self.session,
-                            self.model._name,
-                            self.backend_record.id,
-                            record_id,
-                            **kwargs)
+        # Todo: 加入延时 delay()
+        self.model.import_record(self.backend_record, record_id)
 
 
-DelayedBatchImport = DelayedBatchImporter
-
-
-@job(default_channel='root.woo')
-@related_action(action=link)
-def import_record(session, model_name, backend_id, woo_id, force=False):
-    """ Import a record from Woo """
-    env = get_environment(session, model_name, backend_id)
-    importer = env.get_connector_unit(WooImporter)
-    importer.run(woo_id, force=force)
+# @job(default_channel='root.woo')
+# @related_action(action=link)
+# def import_record(session, model_name, backend_id, woo_id, force=False):
+#     """ Import a record from Woo """
+#     env = get_environment(session, model_name, backend_id)
+#     importer = env.get_connector_unit(WooImporter)
+#     importer.run(woo_id, force=force)

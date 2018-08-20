@@ -18,24 +18,18 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-
-import logging
-import urllib2
-import xmlrpclib
 import base64
-from openerp import models, fields
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.exception import MappingError
-from openerp.addons.connector.unit.synchronizer import (Importer,
-                                                        )
-from openerp.addons.connector.unit.mapper import (mapping,
-                                                  ImportMapper
-                                                  )
-from openerp.addons.connector.exception import IDMissingInBackend
-from ..unit.backend_adapter import (GenericAdapter)
-from ..unit.import_synchronizer import (DelayedBatchImporter, WooImporter)
-from ..connector import get_environment
-from ..backend import woo
+import logging
+try:
+    import urllib2
+except ImportError:
+    import urllib as urllib2
+
+from odoo.addons.component.core import Component
+from odoo.addons.connector.components.mapper import mapping
+from odoo.addons.connector.exception import MappingError
+
+from odoo import models, fields
 
 _logger = logging.getLogger(__name__)
 
@@ -74,21 +68,11 @@ class ProductProduct(models.Model):
     in_stock = fields.Boolean('In Stock')
 
 
-@woo
-class ProductProductAdapter(GenericAdapter):
-    _model_name = 'woo.product.product'
-    _woo_model = 'products/details'
-
-    def _call(self, method, arguments):
-        try:
-            return super(ProductProductAdapter, self)._call(method, arguments)
-        except xmlrpclib.Fault as err:
-            # this is the error in the WooCommerce API
-            # when the customer does not exist
-            if err.faultCode == 102:
-                raise IDMissingInBackend
-            else:
-                raise
+class ProductProductAdapter(Component):
+    _apply_on = 'woo.product.product'
+    _inherit = ['woo.adapter']
+    _name = 'woo.pruduct.adapter'
+    _woo_model = 'products'
 
     def search(self, filters=None, from_date=None, to_date=None):
         """ Search records according to some criteria and return a
@@ -108,34 +92,41 @@ class ProductProductAdapter(GenericAdapter):
             filters.setdefault('updated_at', {})
             filters['updated_at']['to'] = to_date.strftime(dt_fmt)
 
-        return self._call('products/list',
-                          [filters] if filters else [{}])
+        page = 0
+        ids = []
+        while True:
+            page += 1
+            r = self._call().get('%s?page=%s' % (self._woo_model, page))
+            if r.json():
+                for product in r.json():
+                    ids += [product.get('id')]
+            else:
+                break
+        return ids
 
     def get_images(self, id, storeview_id=None):
-        return self._call('products/' + str(id), [int(id), storeview_id, 'id'])
+        # Todo: 这里再一次向Woo API发送了请求，获得相同的回应。应该设法使用上一次的回应，以避免重复。
+        r = self._call().get('%s/' % self._woo_model + str(id))
+        rec = r.json()
+        return rec
 
     def read_image(self, id, image_name, storeview_id=None):
         return self._call('products',
                           [int(id), image_name, storeview_id, 'id'])
 
 
-@woo
-class ProductBatchImporter(DelayedBatchImporter):
+class ProductBatchImporter(Component):
 
     """ Import the WooCommerce Partners.
 
     For every partner in the list, a delayed job is created.
     """
-    _model_name = ['woo.product.product']
-
-    def _import_record(self, woo_id, priority=None):
-        """ Delay a job for the import """
-        super(ProductBatchImporter, self)._import_record(
-            woo_id, priority=priority)
+    _apply_on = ['woo.product.product']
+    _inherit = ['woo.delayed.batch.importer']
+    _name = 'woo.product.batch.importer'
 
     def run(self, filters=None):
         """ Run the synchronization """
-#
         from_date = filters.pop('from_date', None)
         to_date = filters.pop('to_date', None)
         record_ids = self.backend_adapter.search(
@@ -146,47 +137,38 @@ class ProductBatchImporter(DelayedBatchImporter):
         _logger.info('search for woo Products %s returned %s',
                      filters, record_ids)
         for record_id in record_ids:
-            self._import_record(record_id, 30)
+            self._import_record(record_id, priority=30)
 
 
-ProductBatchImporter = ProductBatchImporter
-
-
-@woo
-class ProductProductImporter(WooImporter):
-    _model_name = ['woo.product.product']
+class ProductProductImporter(Component):
+    _name = 'woo.product.product.importer'
+    _inherit = ['woo.importer']
+    _apply_on = ['woo.product.product']
 
     def _import_dependencies(self):
         """ Import the dependencies for the record"""
         record = self.woo_record
-        record = record['product']
-        for woo_category_id in record['categories']:
-            self._import_dependency(woo_category_id,
-                                    'woo.product.category')
-
-    def _create(self, data):
-        openerp_binding = super(ProductProductImporter, self)._create(data)
-        return openerp_binding
+        for woo_category in record['categories']:
+            self._import_dependency(woo_category.get('id'), 'woo.product.category')
 
     def _after_import(self, binding):
         """ Hook called at the end of the import """
-        image_importer = self.unit_for(ProductImageImporter)
-        image_importer.run(self.woo_id, binding.id)
+        # image_importer = self.unit_for(ProductImageImporter)
+        # image_importer.run(self.woo_id, binding.id)
+        self.component(usage='image.importer').run(self.woo_id, binding.id)
         return
 
-ProductProductImport = ProductProductImporter
 
-
-@woo
-class ProductImageImporter(Importer):
+class ProductImageImporter(Component):
 
     """ Import images for a record.
 
     Usually called from importers, in ``_after_import``.
     For instance from the products importer.
     """
-    _model_name = ['woo.product.product',
-                   ]
+    _name = 'woo.product.image.importer'
+    _inherit = ['base.importer']
+    _usage = 'image.importer'
 
     def _get_images(self, storeview_id=None):
         return self.backend_adapter.get_images(self.woo_id)
@@ -226,7 +208,6 @@ class ProductImageImporter(Importer):
     def run(self, woo_id, binding_id):
         self.woo_id = woo_id
         images = self._get_images()
-        images = images['product']
         images = images['images']
         binary = None
         while not binary and images:
@@ -238,9 +219,10 @@ class ProductImageImporter(Importer):
         binding.write({'image': base64.b64encode(binary)})
 
 
-@woo
-class ProductProductImportMapper(ImportMapper):
-    _model_name = 'woo.product.product'
+class ProductProductImportMapper(Component):
+    _name = 'woo.product.import.mapper'
+    _inherit = ['base.import.mapper']
+    _apply_on = 'woo.product.product'
 
     direct = [
         ('description', 'description'),
@@ -248,42 +230,30 @@ class ProductProductImportMapper(ImportMapper):
     ]
 
     @mapping
-    def is_active(self, record):
-        """Check if the product is active in Woo
-        and set active flag in OpenERP
-        status == 1 in Woo means active"""
-        if record['product']:
-            rec = record['product']
-            return {'active': rec['visible']}
-
-    @mapping
     def in_stock(self, record):
-        if record['product']:
-            rec = record['product']
-            return {'in_stock': rec['in_stock']}
+        if record:
+            return {'in_stock': record['in_stock']}
 
     @mapping
     def name(self, record):
-        if record['product']:
-            rec = record['product']
-            return {'name': rec['title']}
+        if record:
+            return {'name': record['name']}
 
     @mapping
     def type(self, record):
-        if record['product']:
-            rec = record['product']
-            if rec['type'] == 'simple':
+        if record:
+            if record['type'] == 'simple':
                 return {'type': 'product'}
 
     @mapping
     def categories(self, record):
-        if record['product']:
-            rec = record['product']
-            woo_categories = rec['categories']
+        if record:
+            woo_categories = record['categories']
             binder = self.binder_for('woo.product.category')
             category_ids = []
             main_categ_id = None
-            for woo_category_id in woo_categories:
+            for woo_category in woo_categories:
+                woo_category_id = woo_category.get('id')
                 cat_id = binder.to_openerp(woo_category_id, unwrap=True)
                 if cat_id is None:
                     raise MappingError("The product category with "
@@ -302,29 +272,17 @@ class ProductProductImportMapper(ImportMapper):
         """ The price is imported at the creation of
         the product, then it is only modified and exported
         from OpenERP """
-        if record['product']:
-            rec = record['product']
-            return {'list_price': rec and rec['price'] or 0.0}
+        if record:
+            return {'list_price': record and record['price'] or 0.0}
 
     @mapping
     def sale_price(self, record):
         """ The price is imported at the creation of
         the product, then it is only modified and exported
         from OpenERP """
-        if record['product']:
-            rec = record['product']
-            return {'standard_price': rec and rec['sale_price'] or 0.0}
+        if record:
+            return {'standard_price': record and record['sale_price'] or 0.0}
 
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
-
-
-@job(default_channel='root.woo')
-def product_import_batch(session, model_name, backend_id, filters=None):
-    """ Prepare the import of product modified on Woo """
-    if filters is None:
-        filters = {}
-    env = get_environment(session, model_name, backend_id)
-    importer = env.get_connector_unit(ProductBatchImporter)
-    importer.run(filters=filters)

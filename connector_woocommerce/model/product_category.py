@@ -20,18 +20,13 @@
 #
 
 import logging
-import xmlrpclib
-from openerp import models, fields
-from openerp.addons.connector.queue.job import job
-from openerp.addons.connector.exception import MappingError
-from openerp.addons.connector.unit.mapper import (mapping,
-                                                  ImportMapper
-                                                  )
-from openerp.addons.connector.exception import IDMissingInBackend
-from ..unit.backend_adapter import (GenericAdapter)
-from ..unit.import_synchronizer import (DelayedBatchImporter, WooImporter)
-from ..connector import get_environment
-from ..backend import woo
+
+from odoo.addons.component.core import Component
+from odoo.addons.connector.components.mapper import mapping
+from odoo.addons.connector.exception import MappingError
+
+from odoo import models, fields
+
 _logger = logging.getLogger(__name__)
 
 
@@ -63,21 +58,11 @@ class WooProductCategory(models.Model):
     count = fields.Integer('count')
 
 
-@woo
-class CategoryAdapter(GenericAdapter):
-    _model_name = 'woo.product.category'
+class CategoryAdapter(Component):
+    _inherit = ['woo.adapter']
+    _name = 'woo.category.adapter'
     _woo_model = 'products/categories'
-
-    def _call(self, method, arguments):
-        try:
-            return super(CategoryAdapter, self)._call(method, arguments)
-        except xmlrpclib.Fault as err:
-            # this is the error in the WooCommerce API
-            # when the customer does not exist
-            if err.faultCode == 102:
-                raise IDMissingInBackend
-            else:
-                raise
+    _apply_on = 'woo.product.category'
 
     def search(self, filters=None, from_date=None, to_date=None):
         """ Search records according to some criteria and return a
@@ -95,24 +80,23 @@ class CategoryAdapter(GenericAdapter):
         if to_date is not None:
             filters.setdefault('updated_at', {})
             filters['updated_at']['to'] = to_date.strftime(dt_fmt)
-        return self._call('products/categories/list',
-                          [filters] if filters else [{}])
+
+        ids = []
+        r = self._call().get(self._woo_model)
+        for category in r.json():
+            ids += [category.get('id')]
+        return ids
 
 
-@woo
-class CategoryBatchImporter(DelayedBatchImporter):
+class CategoryBatchImporter(Component):
 
     """ Import the WooCommerce Partners.
 
     For every partner in the list, a delayed job is created.
     """
-    _model_name = ['woo.product.category']
-
-    def _import_record(self, woo_id, priority=None):
-        """ Delay a job for the import """
-
-        super(CategoryBatchImporter, self)._import_record(
-            woo_id, priority=priority)
+    _inherit = ['woo.delayed.batch.importer']
+    _name = 'woo.category.batch.importer'
+    _apply_on = ['woo.product.category']
 
     def run(self, filters=None):
         """ Run the synchronization """
@@ -127,56 +111,42 @@ class CategoryBatchImporter(DelayedBatchImporter):
                      filters, record_ids)
         for record_id in record_ids:
             self._import_record(record_id)
-CategoryBatchImporter = CategoryBatchImporter
 
 
-@woo
-class ProductCategoryImporter(WooImporter):
-    _model_name = ['woo.product.category']
+class ProductCategoryImporter(Component):
+    _apply_on = ['woo.product.category']
+    _name = 'woo.product.category.importer'
+    _inherit = ['woo.importer']
 
     def _import_dependencies(self):
         """ Import the dependencies for the record"""
         record = self.woo_record
         # import parent category
         # the root category has a 0 parent_id
-        record = record['product_category']
         if record['parent']:
             parent_id = record['parent']
             if self.binder.to_openerp(parent_id) is None:
-                importer = self.unit_for(WooImporter)
-                importer.run(parent_id)
+                self.run(parent_id)
         return
 
-    def _create(self, data):
-        openerp_binding = super(ProductCategoryImporter, self)._create(data)
-        return openerp_binding
 
-    def _after_import(self, binding):
-        """ Hook called at the end of the import """
-        return
-
-ProductCategoryImport = ProductCategoryImporter
-
-
-@woo
-class ProductCategoryImportMapper(ImportMapper):
-    _model_name = 'woo.product.category'
+class ProductCategoryImportMapper(Component):
+    _apply_on = 'woo.product.category'
+    _name = 'woo.category.import.mapper'
+    _inherit = ['base.import.mapper']
 
     @mapping
-    def name(self, record):
-        if record['product_category']:
-            rec = record['product_category']
+    def name(self, rec):
+        if rec:
             return {'name': rec['name']}
 
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
-#
 
     @mapping
-    def parent_id(self, record):
-        if record['product_category']:
-            rec = record['product_category']
+    def parent_id(self, rec):
+        if rec:
             if not rec['parent']:
                 return
             binder = self.binder_for()
@@ -187,11 +157,3 @@ class ProductCategoryImportMapper(ImportMapper):
                                    "woo id %s is not imported." %
                                    rec['parent'])
             return {'parent_id': category_id, 'woo_parent_id': woo_cat_id}
-
-
-@job(default_channel='root.woo')
-def category_import_batch(session, model_name, backend_id, filters=None):
-    """ Prepare the import of category modified on WooCommerce """
-    env = get_environment(session, model_name, backend_id)
-    importer = env.get_connector_unit(CategoryBatchImporter)
-    importer.run(filters=filters)

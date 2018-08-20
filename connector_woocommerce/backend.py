@@ -18,11 +18,3 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-
-import openerp.addons.connector.backend as backend
-
-woo = backend.Backend('woo')
-""" Generic woo Backend """
-
-woov2 = backend.Backend(parent=woo, version='v2')
-""" WooCommerce Backend for version v2 """

@@ -18,19 +18,22 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
+import logging
 
-import openerp
-from openerp.addons.connector.connector import Binder
-from ..backend import woo
+from odoo.addons.component.core import Component, AbstractComponent
 
+from odoo import fields, models
 
-class WooBinder(Binder):
+_logger = logging.getLogger(__name__)
+
+class WooBinder(AbstractComponent):
 
     """ Generic Binder for WooCommerce """
+    _name = 'woo.binder'
+    _inherit = ['base.binder']
 
 
-@woo
-class WooModelBinder(WooBinder):
+class WooModelBinder(Component):
 
     """
     Bindings are done directly on the binding model.woo.product.category
@@ -41,13 +44,17 @@ class WooModelBinder(WooBinder):
     the Woo ID, the ID of the Woo Backend and the additional
     fields belonging to the Woo instance.
     """
-    _model_name = [
+    _name = 'woo.model.binder'
+    _inherit = ['woo.binder']
+    '''
+    _apply_on = [
         'woo.res.partner',
         'woo.product.category',
         'woo.product.product',
         'woo.sale.order',
         'woo.sale.order.line',
     ]
+    '''
 
     def to_openerp(self, external_id, unwrap=False, browse=False):
         """ Give the OpenERP ID for an external ID
@@ -84,7 +91,7 @@ class WooModelBinder(WooBinder):
         :return: backend identifier of the record
         """
         record = self.model.browse()
-        if isinstance(record_id, openerp.models.BaseModel):
+        if isinstance(record_id, models.BaseModel):
             record_id.ensure_one()
             record = record_id
             record_id = record_id.id
@@ -119,8 +126,8 @@ class WooModelBinder(WooBinder):
             "got: %s, %s" % (external_id, binding_id)
         )
         # avoid to trigger the export when we modify the `woo_id`
-        now_fmt = openerp.fields.Datetime.now()
-        if not isinstance(binding_id, openerp.models.BaseModel):
+        now_fmt = fields.Datetime.now()
+        if not isinstance(binding_id, models.BaseModel):
             binding_id = self.model.browse(binding_id)
         binding_id.with_context(connector_no_export=True).write(
             {'woo_id': str(external_id),
@@ -136,7 +143,7 @@ class WooModelBinder(WooBinder):
         :param browse: when True, returns a browse_record instance
                        rather than an ID
         """
-        if isinstance(binding_id, openerp.models.BaseModel):
+        if isinstance(binding_id, models.BaseModel):
             binding = binding_id
         else:
             binding = self.model.browse(binding_id)

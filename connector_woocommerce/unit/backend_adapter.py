@@ -19,17 +19,18 @@
 #
 #
 
-import socket
 import logging
-import xmlrpclib
+import socket
+try:
+    from xmlrpc import client as xmlrpclib
+except ImportError:
+    import xmlrpclib
+
+from odoo.addons.component.core import AbstractComponent
+from odoo.addons.connector.exception import (NetworkRetryableError,
+                                             RetryableJobError)
 from woocommerce import API
 
-from openerp.addons.connector.unit.backend_adapter import CRUDAdapter
-from openerp.addons.connector.exception import (NetworkRetryableError,
-                                                RetryableJobError)
-from openerp.tools.safe_eval import safe_eval
-
-from datetime import datetime
 _logger = logging.getLogger(__name__)
 
 recorder = {}
@@ -76,10 +77,11 @@ def output_recorder(filename):
 
 class WooLocation(object):
 
-    def __init__(self, location, consumer_key, consumre_secret):
+    def __init__(self, location, consumer_key, consumre_secret, version):
         self._location = location
         self.consumer_key = consumer_key
         self.consumer_secret = consumre_secret
+        self.version = version
 
     @property
     def location(self):
@@ -87,9 +89,12 @@ class WooLocation(object):
         return location
 
 
-class WooCRUDAdapter(CRUDAdapter):
-
+class WooCRUDAdapter(AbstractComponent):
     """ External Records Adapter for woo """
+
+    _name = 'woo.crud.adapter'
+    _inherit = ['base.backend.adapter']
+    _usage = 'backend.adapter'
 
     def __init__(self, connector_env):
         """
@@ -102,7 +107,9 @@ class WooCRUDAdapter(CRUDAdapter):
         woo = WooLocation(
             backend.location,
             backend.consumer_key,
-            backend.consumer_secret)
+            backend.consumer_secret,
+            backend.version
+        )
         self.woo = woo
 
     def search(self, filters=None):
@@ -131,14 +138,20 @@ class WooCRUDAdapter(CRUDAdapter):
         """ Delete a record on the external system """
         raise NotImplementedError
 
-    def _call(self, method, arguments):
+    # def _call(self, method, arguments):
+    def _call(self):
         try:
-            _logger.debug("Start calling Woocommerce api %s", method)
-            api = API(url=self.woo.location,
-                      consumer_key=self.woo.consumer_key,
-                      consumer_secret=self.woo.consumer_secret,
-                      version='v2')
+            # _logger.debug("Start calling Woocommerce api %s", method)
+            api = API(
+                url=self.woo.location,
+                consumer_key=self.woo.consumer_key,
+                consumer_secret=self.woo.consumer_secret,
+                version=self.woo.version,
+                wp_api=True,
+            )
             if api:
+                '''
+                Todo: 在实现对Woo的C、D、S、W后，再将重复的代码集中（抽象）到这里。
                 if isinstance(arguments, list):
                     while arguments and arguments[-1] is None:
                         arguments.pop()
@@ -160,6 +173,8 @@ class WooCRUDAdapter(CRUDAdapter):
                                   method, arguments, result,
                                   (datetime.now() - start).seconds)
                 return result
+                '''
+                return api
         except (socket.gaierror, socket.error, socket.timeout) as err:
             raise NetworkRetryableError(
                 'A network error caused the failure of the job: '
@@ -179,10 +194,9 @@ class WooCRUDAdapter(CRUDAdapter):
                 raise
 
 
-class GenericAdapter(WooCRUDAdapter):
-
-    _model_name = None
-    _woo_model = None
+class GenericAdapter(AbstractComponent):
+    _name = 'woo.adapter'
+    _inherit = ['woo.crud.adapter']
 
     def search(self, filters=None):
         """ Search records according to some criterias
@@ -190,6 +204,7 @@ class GenericAdapter(WooCRUDAdapter):
 
         :rtype: list
         """
+        _logger.info(u'如果调用，肯定报错。')
         return self._call('%s.search' % self._woo_model,
                           [filters] if filters else [{}])
 
@@ -206,7 +221,9 @@ class GenericAdapter(WooCRUDAdapter):
             # attributes). The right correction is to install the
             # compatibility patch on WooCommerce.
             arguments.append(attributes)
-        return self._call('%s/' % self._woo_model + str(id), [])
+        r = self._call().get('%s/' % self._woo_model + str(id))
+        rec = r.json()
+        return rec
 
     def search_read(self, filters=None):
         """ Search records according to some criterias
