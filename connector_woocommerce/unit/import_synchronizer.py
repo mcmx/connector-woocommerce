@@ -267,8 +267,7 @@ class DelayedBatchImporter(AbstractComponent):
 
     def _import_record(self, record_id, **kwargs):
         """ Delay the import of the records"""
-        # Todo: 加入延时 delay()
-        self.model.import_record(self.backend_record, record_id)
+        self.model.with_delay().import_record(self.backend_record, record_id)
 
 
 # @job(default_channel='root.woo')

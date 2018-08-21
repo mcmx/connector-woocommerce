@@ -108,22 +108,22 @@ class wc_backend(models.Model):
 
     @api.multi
     def import_category(self):
-        self.env['woo.product.category'].import_batch(self)
+        self.env['woo.product.category'].with_delay().import_batch(self)
         return True
 
     @api.multi
     def import_product(self):
-        self.env['woo.product.product'].import_batch(self)
+        self.env['woo.product.product'].with_delay().import_batch(self)
         return True
 
     @api.multi
     def import_customer(self):
-        self.env['woo.res.partner'].import_batch(self)
+        self.env['woo.res.partner'].with_delay().import_batch(self)
         return True
 
     @api.multi
     def import_order(self):
-        self.env['woo.sale.order'].import_batch(self)
+        self.env['woo.sale.order'].with_delay().import_batch(self)
         return True
 
     @api.multi
