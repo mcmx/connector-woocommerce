@@ -101,12 +101,6 @@ class ProductProductAdapter(Component):
                 break
         return ids
 
-    def get_images(self, id, storeview_id=None):
-        # Todo: 这里再一次向Woo API发送了请求，获得相同的回应。应该设法使用上一次的回应，以避免重复。
-        r = self._call().get('%s/' % self._woo_model + str(id))
-        rec = r.json()
-        return rec
-
     def read_image(self, id, image_name, storeview_id=None):
         return self._call('products',
                           [int(id), image_name, storeview_id, 'id'])
@@ -152,7 +146,7 @@ class ProductProductImporter(Component):
         """ Hook called at the end of the import """
         # image_importer = self.unit_for(ProductImageImporter)
         # image_importer.run(self.woo_id, binding.id)
-        self.component(usage='image.importer').run(self.woo_id, binding.id)
+        self.component(usage='image.importer').run(self.woo_record, binding.id)
         return
 
 
@@ -166,9 +160,6 @@ class ProductImageImporter(Component):
     _name = 'woo.product.image.importer'
     _inherit = ['base.importer']
     _usage = 'image.importer'
-
-    def _get_images(self, storeview_id=None):
-        return self.backend_adapter.get_images(self.woo_id)
 
     def _sort_images(self, images):
         """ Returns a list of images sorted by their priority.
@@ -188,10 +179,8 @@ class ProductImageImporter(Component):
         url = image_data['src']
         return requests.get(url).content
 
-    def run(self, woo_id, binding_id):
-        self.woo_id = woo_id
-        images = self._get_images()
-        images = images['images']
+    def run(self, woo_record, binding_id):
+        images = woo_record.get('images')
         binary = None
         while not binary and images:
             binary = self._get_binary_image(images.pop())
