@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 #
 #
 #    Tech-Receptives Solutions Pvt. Ltd.
@@ -20,11 +20,8 @@
 #
 import base64
 import logging
-try:
-    import urllib2
-except ImportError:
-    import urllib as urllib2
 
+import requests
 from odoo.addons.component.core import Component
 from odoo.addons.connector.components.mapper import mapping
 from odoo.addons.connector.exception import MappingError
@@ -188,22 +185,8 @@ class ProductImageImporter(Component):
         # the the higher priority)
 
     def _get_binary_image(self, image_data):
-        url = image_data['src'].encode('utf8')
-        url = str(url).replace("\\", '')
-        try:
-            request = urllib2.Request(url)
-            binary = urllib2.urlopen(request)
-        except urllib2.HTTPError as err:
-            if err.code == 404:
-                # the image is just missing, we skip it
-                return
-            else:
-                # we don't know why we couldn't download the image
-                # so we propagate the error, the import will fail
-                # and we have to check why it couldn't be accessed
-                raise
-        else:
-            return binary.read()
+        url = image_data['src']
+        return requests.get(url).content
 
     def run(self, woo_id, binding_id):
         self.woo_id = woo_id
