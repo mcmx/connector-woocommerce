@@ -18,6 +18,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
+import platform
 
 from woocommerce import API
 
@@ -108,22 +109,34 @@ class wc_backend(models.Model):
 
     @api.multi
     def import_category(self):
-        self.env['woo.product.category'].with_delay().import_batch(self)
+        if platform.system() == 'Linux':
+            self.env['woo.product.category'].with_delay().import_batch(self)
+        else:
+            self.env['woo.product.category'].import_batch(self)
         return True
 
     @api.multi
     def import_product(self):
-        self.env['woo.product.product'].with_delay().import_batch(self)
+        if platform.system() == 'Linux':
+            self.env['woo.product.product'].with_delay().import_batch(self)
+        else:
+            self.env['woo.product.product'].import_batch(self)
         return True
 
     @api.multi
     def import_customer(self):
-        self.env['woo.res.partner'].with_delay().import_batch(self)
+        if platform.system() == 'Linux':
+            self.env['woo.res.partner'].with_delay().import_batch(self)
+        else:
+            self.env['woo.res.partner'].import_batch(self)
         return True
 
     @api.multi
     def import_order(self):
-        self.env['woo.sale.order'].with_delay().import_batch(self)
+        if platform.system() == 'Linux':
+            self.env['woo.sale.order'].with_delay().import_batch(self)
+        else:
+            self.env['woo.sale.order'].import_batch(self)
         return True
 
     @api.multi
