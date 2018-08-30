@@ -20,6 +20,7 @@
 #
 
 import logging
+import platform
 from datetime import datetime
 
 from odoo.addons.component.core import AbstractComponent
@@ -122,7 +123,7 @@ class WooImporter(AbstractComponent):
 
     def _map_data(self):
         """ Returns an instance of
-        :py:class:`~openerp.addons.connector.unit.mapper.MapRecord`
+        :py:class:`~openerp.addons.connector.components.mapper.MapRecord`
 
         """
         return self.mapper.map_record(self.woo_record)
@@ -267,7 +268,10 @@ class DelayedBatchImporter(AbstractComponent):
 
     def _import_record(self, record_id, **kwargs):
         """ Delay the import of the records"""
-        self.model.with_delay().import_record(self.backend_record, record_id)
+        if platform.system() == 'Linux':
+            self.model.with_delay().import_record(self.backend_record, record_id)
+        else:
+            self.model.import_record(self.backend_record, record_id)
 
 
 # @job(default_channel='root.woo')

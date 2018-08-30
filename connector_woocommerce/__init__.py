@@ -20,6 +20,6 @@
 #
 
 from . import connector
-from . import unit
+from . import components
 from . import model
 from . import backend
