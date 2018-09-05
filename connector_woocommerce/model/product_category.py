@@ -126,7 +126,7 @@ class ProductCategoryImporter(Component):
         if record['parent']:
             parent_id = record['parent']
             if self.binder.to_openerp(parent_id) is None:
-                self.run(parent_id)
+                self.component(usage='record.importer').run(parent_id, force=False)
         return
 
 
