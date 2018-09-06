@@ -116,6 +116,14 @@ class wc_backend(models.Model):
         return True
 
     @api.multi
+    def export_category(self):
+        if platform.system() == 'Linux':
+            self.env['woo.product.category'].with_delay().export_batch(self)
+        else:
+            self.env['woo.product.category'].export_batch(self)
+        return True
+
+    @api.multi
     def import_product(self):
         if platform.system() == 'Linux':
             self.env['woo.product.product'].with_delay().import_batch(self)
@@ -144,6 +152,13 @@ class wc_backend(models.Model):
         """ Import Product categories """
         for backend in self:
             backend.import_category()
+        return True
+
+    @api.multi
+    def export_categories(self):
+        """ Import Product categories """
+        for backend in self:
+            backend.export_category()
         return True
 
     @api.multi

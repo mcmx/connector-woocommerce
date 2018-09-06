@@ -232,12 +232,15 @@ class GenericAdapter(AbstractComponent):
 
     def create(self, data):
         """ Create a record on the external system """
-        return self._call('%s.create' % self._woo_model, [data])
+        res = self._call().post('%s' % self._woo_model, {
+            'name': data.get('name'),
+            'parent': data.get('woo_id_parent')
+        }).json()
+        return res
 
     def write(self, id, data):
         """ Update records on the external system """
-        return self._call('%s.update' % self._woo_model,
-                          [int(id), data])
+        return self._call().put('%s/%s' % (self._woo_model, int(id)), data).json()
 
     def delete(self, id):
         """ Delete a record on the external system """

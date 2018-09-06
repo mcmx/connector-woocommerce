@@ -69,3 +69,22 @@ class WooBinding(models.AbstractModel):
         with backend.work_on(self._name) as work:
             importer = work.component(usage='record.importer')
             return importer.run(external_id, force=force)
+
+    @job(default_channel='root.woo')
+    @api.model
+    def export_batch(self, backend, filters=None):
+        """ Prepare the import of records modified on WooCommerce """
+        if filters is None:
+            filters = {}
+        with backend.work_on(self._name) as work:
+            exporter = work.component(usage='batch.exporter')
+            return exporter.run(filters=filters)
+
+    @job(default_channel='root.woo')
+    @related_action(action='related_action_woo_link')
+    @api.model
+    def export_record(self, backend, id, force=False):
+        """ Import a WooCommerce record """
+        with backend.work_on(self._name) as work:
+            exporter = work.component(usage='record.exporter')
+            return exporter.run(id, force=force)

@@ -157,3 +157,75 @@ class ProductCategoryImportMapper(Component):
                                    "woo id %s is not imported." %
                                    rec['parent'])
             return {'parent_id': category_id, 'woo_parent_id': woo_cat_id}
+
+
+class CategoryBatchExporter(Component):
+
+    """ Import the WooCommerce Partners.
+
+    For every partner in the list, a delayed job is created.
+    """
+    _inherit = ['woo.delayed.batch.exporter']
+    _name = 'woo.category.batch.exporter'
+    _apply_on = ['woo.product.category']
+
+    def run(self, filters=None):
+        """ Run the synchronization """
+        from_date = filters.pop('from_date', None)
+        to_date = filters.pop('to_date', None)
+        if not filters:
+            filters = []
+
+        record_ids = self.model.openerp_id.search(filters).ids
+        _logger.info('search for odoo Product Category %s returned %s',
+                     filters, record_ids)
+        for record_id in record_ids:
+            self._export_record(record_id)
+
+
+class ProductCategoryExporter(Component):
+    _apply_on = ['woo.product.category']
+    _name = 'woo.product.category.exporter'
+    _inherit = ['woo.exporter']
+
+    def _export_dependencies(self):
+        """ Import the dependencies for the record"""
+        record = self.odoo_record
+        # export parent category
+        # the root category has a 0 parent_id
+        if record.parent_id:
+            parent_id = record.parent_id.id
+            if self.binder.to_openerp(parent_id) is None:
+                # self.run(parent_id)
+                self.component(usage='record.exporter').run(parent_id, force=False)
+        return
+
+
+class ProductCategoryExportMapper(Component):
+    _apply_on = 'woo.product.category'
+    _name = 'woo.category.export.mapper'
+    _inherit = ['base.export.mapper']
+
+    @mapping
+    def name(self, rec):
+        if rec:
+            return {'name': rec['name']}
+
+    @mapping
+    def backend_id(self, record):
+        return {'backend_id': self.backend_record.id}
+
+    @mapping
+    def parent_id(self, rec):
+        if rec:
+            if not rec.parent_id:
+                return
+            binder = self.binder_for()
+            woo_id_parent = binder.to_backend(rec.parent_id.id, wrap=True)
+            woo_parent_id = binder.to_openerp(external_id=woo_id_parent)
+
+            return {'woo_id_parent': woo_id_parent, 'woo_parent_id': woo_parent_id}
+
+    @mapping
+    def openerp_id(self, rec):
+        return {'openerp_id': rec.id}

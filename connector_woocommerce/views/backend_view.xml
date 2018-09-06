@@ -38,12 +38,15 @@
 							<field name="verify_ssl" />
 							<field name="default_lang_id" />
 						</group>
-						<group>
+
+						<group col="4">
 							<label string="Import category" class="oe_inline" />
 							<button name="import_categories" type="object" class="oe_highlight"
 								string="Import in background" />
+							<label string="Export category" class="oe_inline" />
+							<button name="export_categories" type="object" class="oe_highlight"
+								string="Export in background" />
 						</group>
-						
 						
 						<group>
 							<label string="Import Product" class="oe_inline" />
