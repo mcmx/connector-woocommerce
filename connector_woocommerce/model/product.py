@@ -107,7 +107,6 @@ class ProductProductAdapter(Component):
 
 
 class ProductBatchImporter(Component):
-
     """ Import the WooCommerce Partners.
 
     For every partner in the list, a delayed job is created.
@@ -151,7 +150,6 @@ class ProductProductImporter(Component):
 
 
 class ProductImageImporter(Component):
-
     """ Import images for a record.
 
     Usually called from importers, in ``_after_import``.
@@ -261,7 +259,6 @@ class ProductProductImportMapper(Component):
 
 
 class ProductBatchExporter(Component):
-
     """ Export the Odoo Products.
 
     For every Product in the list, a delayed job is created.
@@ -294,53 +291,6 @@ class ProductProductExporter(Component):
         record = self.odoo_record
         for odoo_category in record.categ_id:
             self._export_dependency(odoo_category.id, 'woo.product.category')
-
-    def _after_export(self, binding):
-        """ Hook called at the end of the export """
-        # Todo
-        # self.component(usage='image.exporter').run(self.woo_record, binding.id)
-        return
-
-
-class ProductImageExporter(Component):
-
-    """ Export images for a record.
-
-    Usually called from Exporters, in ``_after_export``.
-    For instance from the products Exporter.
-    """
-    _name = 'woo.product.image.exporter'
-    _inherit = ['base.exporter']
-    _usage = 'image.exporter'
-
-    def _sort_images(self, images):
-        """ Returns a list of images sorted by their priority.
-        An image with the 'image' type is the the primary one.
-        The other images are sorted by their position.
-
-        The returned list is reversed, the items at the end
-        of the list have the higher priority.
-        """
-        if not images:
-            return {}
-        # place the images where the type is 'image' first then
-        # sort them by the reverse priority (last item of the list has
-        # the the higher priority)
-
-    def _get_binary_image(self, image_data):
-        url = image_data['src']
-        return requests.get(url).content
-
-    def run(self, woo_record, binding_id):
-        images = woo_record.get('images')
-        binary = None
-        while not binary and images:
-            binary = self._get_binary_image(images.pop())
-        if not binary:
-            return
-        model = self.model.with_context(connector_no_export=True)
-        binding = model.browse(binding_id)
-        binding.write({'image': base64.b64encode(binary)})
 
 
 class ProductProductExportMapper(Component):
@@ -403,3 +353,8 @@ class ProductProductExportMapper(Component):
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
+
+    @mapping
+    def image(self, record):
+        """Todo"""
+        return
