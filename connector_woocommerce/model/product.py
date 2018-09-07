@@ -258,3 +258,148 @@ class ProductProductImportMapper(Component):
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
+
+
+class ProductBatchExporter(Component):
+
+    """ Export the Odoo Products.
+
+    For every Product in the list, a delayed job is created.
+    """
+    _apply_on = ['woo.product.product']
+    _inherit = ['woo.delayed.batch.exporter']
+    _name = 'woo.product.batch.exporter'
+
+    def run(self, filters=None):
+        """ Run the synchronization """
+        from_date = filters.pop('from_date', None)
+        to_date = filters.pop('to_date', None)
+        if not filters:
+            filters = []
+
+        record_ids = self.model.openerp_id.search(filters).ids
+        _logger.info('search for woo Products %s returned %s',
+                     filters, record_ids)
+        for record_id in record_ids:
+            self._export_record(record_id, priority=30)
+
+
+class ProductProductExporter(Component):
+    _name = 'woo.product.product.exporter'
+    _inherit = ['woo.exporter']
+    _apply_on = ['woo.product.product']
+
+    def _export_dependencies(self):
+        """ Export the dependencies for the record"""
+        record = self.odoo_record
+        for odoo_category in record.categ_id:
+            self._export_dependency(odoo_category.id, 'woo.product.category')
+
+    def _after_export(self, binding):
+        """ Hook called at the end of the export """
+        # Todo
+        # self.component(usage='image.exporter').run(self.woo_record, binding.id)
+        return
+
+
+class ProductImageExporter(Component):
+
+    """ Export images for a record.
+
+    Usually called from Exporters, in ``_after_export``.
+    For instance from the products Exporter.
+    """
+    _name = 'woo.product.image.exporter'
+    _inherit = ['base.exporter']
+    _usage = 'image.exporter'
+
+    def _sort_images(self, images):
+        """ Returns a list of images sorted by their priority.
+        An image with the 'image' type is the the primary one.
+        The other images are sorted by their position.
+
+        The returned list is reversed, the items at the end
+        of the list have the higher priority.
+        """
+        if not images:
+            return {}
+        # place the images where the type is 'image' first then
+        # sort them by the reverse priority (last item of the list has
+        # the the higher priority)
+
+    def _get_binary_image(self, image_data):
+        url = image_data['src']
+        return requests.get(url).content
+
+    def run(self, woo_record, binding_id):
+        images = woo_record.get('images')
+        binary = None
+        while not binary and images:
+            binary = self._get_binary_image(images.pop())
+        if not binary:
+            return
+        model = self.model.with_context(connector_no_export=True)
+        binding = model.browse(binding_id)
+        binding.write({'image': base64.b64encode(binary)})
+
+
+class ProductProductExportMapper(Component):
+    _name = 'woo.product.export.mapper'
+    _inherit = ['base.export.mapper']
+    _apply_on = 'woo.product.product'
+
+    @mapping
+    def in_stock(self, record):
+        if record:
+            return {'in_stock': record.in_stock}
+
+    @mapping
+    def name(self, record):
+        if record:
+            return {'name': record.name}
+
+    @mapping
+    def categories(self, record):
+        if record:
+            odoo_categories = record.woo_categ_ids
+
+            need_append = True
+            for odoo_category in odoo_categories:
+                if odoo_category.id == record.categ_id.id:
+                    need_append = False
+            if need_append:
+                odoo_categories += record.categ_id
+
+            binder = self.binder_for('woo.product.category')
+            woo_category_ids = []
+            for odoo_category in odoo_categories:
+                odoo_category_id = odoo_category.id
+                woo_category_id = binder.to_backend(odoo_category_id, wrap=True)
+                if woo_category_id is None:
+                    raise MappingError("The product category with "
+                                       "odoo id %s is not exported." %
+                                       odoo_category_id)
+                woo_category_ids.append({'id': woo_category_id})
+
+            result = {'categories': woo_category_ids}
+            return result
+
+    @mapping
+    def price(self, record):
+        """ The price is exported at the creation of
+        the product, then it is only modified and imported
+        to OpenERP """
+        if record:
+            return {'price': record and record.list_price or 0.0}
+
+    @mapping
+    def sale_price(self, record):
+        """ The price is exported at the creation of
+        the product, then it is only modified and exported
+        from OpenERP """
+        if record:
+            return {'sale_price': record and str(record.standard_price) or '0.0'}
+
+    @mapping
+    def backend_id(self, record):
+        return {'backend_id': self.backend_record.id}

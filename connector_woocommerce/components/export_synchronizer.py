@@ -87,7 +87,7 @@ class WooExporter(AbstractComponent):
         if exporter_class is None:
             exporter_class = self._usage
         binder = self.binder_for(binding_model)
-        if always or binder.to_backend(odoo_id) is None:
+        if always or binder.to_backend(odoo_id, wrap=True) is None:
             exporter = self.component(usage=exporter_class, model_name=binding_model)
             exporter.run(odoo_id)
 
