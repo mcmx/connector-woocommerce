@@ -222,8 +222,9 @@ class GenericAdapter(AbstractComponent):
             # compatibility patch on WooCommerce.
             arguments.append(attributes)
         r = self._call().get('%s/' % self._woo_model + str(id))
-        rec = r.json()
-        return rec
+        res = r.json()
+        _logger.info(res)
+        return res
 
     def search_read(self, filters=None):
         """ Search records according to some criterias
@@ -232,15 +233,19 @@ class GenericAdapter(AbstractComponent):
 
     def create(self, data):
         """ Create a record on the external system """
-        res = self._call().post('%s' % self._woo_model, {
-            'name': data.get('name'),
-            'parent': data.get('woo_id_parent')
-        }).json()
+        if data.get('woo_id_parent', None):
+            data['parent'] = data.get('woo_id_parent')
+            del data['woo_id_parent']
+
+        res = self._call().post('%s' % self._woo_model, data).json()
+        _logger.info(res)
         return res
 
     def write(self, id, data):
         """ Update records on the external system """
-        return self._call().put('%s/%s' % (self._woo_model, int(id)), data).json()
+        res = self._call().put('%s/%s' % (self._woo_model, int(id)), data).json()
+        _logger.info(res)
+        return res
 
     def delete(self, id):
         """ Delete a record on the external system """
