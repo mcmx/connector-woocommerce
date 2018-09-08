@@ -47,7 +47,6 @@
 							<button name="export_categories" type="object" class="oe_highlight"
 								string="Export in background" />
 						</group>
-						
 						<group col="4">
 							<label string="Import Product" class="oe_inline" />
 							<button name="import_products" type="object" class="oe_highlight"
@@ -56,10 +55,13 @@
 							<button name="export_products" type="object" class="oe_highlight"
 								string="Export in background" />
 						</group>
-						<group>
+						<group col="4">
 							<label string="Import Customers" class="oe_inline" />
 							<button name="import_customers" type="object" class="oe_highlight"
 								string="Import in background" />
+							<label string="Export Customers" class="oe_inline" />
+							<button name="export_customers" type="object" class="oe_highlight"
+								string="Export in background" />
 						</group>
 						<group>
                             <label string="Import Sale Orders" class="oe_inline" />
