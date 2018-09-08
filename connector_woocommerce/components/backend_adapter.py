@@ -148,6 +148,7 @@ class WooCRUDAdapter(AbstractComponent):
                 consumer_secret=self.woo.consumer_secret,
                 version=self.woo.version,
                 wp_api=True,
+                timeout=None,
             )
             if api:
                 '''

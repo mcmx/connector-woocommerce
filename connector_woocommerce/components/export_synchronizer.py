@@ -192,7 +192,8 @@ class WooExporter(AbstractComponent):
         else:
             record = self._create_data(map_record)
             woo_id = self.backend_adapter.create(record).get('id')
-            self.binder.bind(woo_id, self._create(record))
+            if woo_id:
+                self.binder.bind(woo_id, self._create(record))
 
         self._after_export(woo_id)
 
