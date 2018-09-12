@@ -164,6 +164,14 @@ class wc_backend(models.Model):
         return True
 
     @api.multi
+    def export_order(self):
+        if platform.system() == 'Linux':
+            self.env['woo.sale.order'].with_delay().export_batch(self)
+        else:
+            self.env['woo.sale.order'].export_batch(self)
+        return True
+
+    @api.multi
     def import_categories(self):
         """ Import Product categories """
         for backend in self:
@@ -210,4 +218,11 @@ class wc_backend(models.Model):
         """ Import Orders from all websites """
         for backend in self:
             backend.import_order()
+        return True
+
+    @api.multi
+    def export_orders(self):
+        """ Import Orders from all websites """
+        for backend in self:
+            backend.export_order()
         return True

@@ -297,8 +297,7 @@ class SaleOrderImportMapper(Component):
             if rec['customer_id']:
                 partner_id = binder.to_openerp(rec['customer_id'],
                                                unwrap=True) or False
-                assert partner_id, ("Please Check Customer Role \
-                                    in WooCommerce")
+                assert partner_id, ("Please Check Customer Role in WooCommerce")
                 result = {'partner_id': partner_id}
                 onchange_val = self.env['sale.order'].onchange_partner_id(
                     partner_id)
@@ -340,3 +339,142 @@ class SaleOrderImportMapper(Component):
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
+
+
+class SaleOrderLineExportMapper(Component):
+    _name = 'woo.sale.line.export.mapper'
+    _inherit = ['base.export.mapper']
+    _apply_on = 'woo.sale.order.line'
+
+    direct = [('quantity', 'product_uom_qty'),
+              # ('quantity', 'product_uos_qty'),
+              ('name', 'name'),
+              ('price', 'price_unit')
+              ]
+
+    @mapping
+    def product_id(self, record):
+        binder = self.binder_for('woo.product.product')
+        product_id = binder.to_openerp(record['product_id'], unwrap=True)
+        assert product_id is not None, (
+            "product_id %s should have been exported in "
+            "SaleOrderExporter._export_dependencies" % record['product_id'])
+        return {'product_id': product_id}
+
+
+class SaleOrderBatchExporter(Component):
+
+    """ export the WooCommerce Partners.
+
+    For every partner in the list, a delayed job is created.
+    """
+    _inherit = ['woo.delayed.batch.exporter']
+    _name = 'woo.sale.batch.exporter'
+    _apply_on = ['woo.sale.order']
+
+    def update_existing_order(self, woo_sale_order, record_id):
+        """ Enter Your logic for Existing Sale Order """
+        return True
+
+    def run(self, filters=None):
+        """ Run the synchronization """
+        from_date = filters.pop('from_date', None)
+        to_date = filters.pop('to_date', None)
+        filters = []
+        record_ids = self.model.openerp_id.search(filters).ids
+        _logger.info('search for woo partners %s returned %s',
+                     filters, record_ids)
+        for record_id in record_ids:
+            self._export_record(record_id, priority=50)
+
+
+class SaleOrderExporter(Component):
+    _name = 'woo.sale.exporter'
+    _inherit = ['woo.exporter']
+    _apply_on = ['woo.sale.order']
+
+    def _export_addresses(self):
+        record = self.odoo_record
+        self._export_dependency(record.partner_id.id, 'woo.res.partner')
+
+    def _export_dependencies(self):
+        """ Export the dependencies for the record"""
+        record = self.odoo_record
+
+        self._export_addresses()
+        record = record.order_line
+        for line in record:
+            _logger.debug('line: %s', line)
+            if line.product_id:
+                self._export_dependency(line.product_id.id, 'woo.product.product')
+
+    def _clean_woo_items(self, resource):
+        """
+        Method that clean the sale order line given by WooCommerce before
+        exporting it
+
+        This method has to stay here because it allow to customize the
+        behavior of the sale order.
+
+        """
+        child_items = {}  # key is the parent item id
+        top_items = []
+
+        # Group the childs with their parent
+        for item in resource['line_items']:
+            if item.get('parent_item_id'):
+                child_items.setdefault(item['parent_item_id'], []).append(item)
+            else:
+                top_items.append(item)
+
+        all_items = []
+        for top_item in top_items:
+            all_items.append(top_item)
+        resource['items'] = all_items
+        return resource
+
+    def _get_woo_data(self):
+        """ Return the raw WooCommerce data for ``self.woo_id`` """
+        record = super(SaleOrderExporter, self)._get_woo_data()
+        # sometimes we need to clean woo items (ex : configurable
+        # product in a sale)
+        record = self._clean_woo_items(record)
+        return record
+
+
+class SaleOrderExportMapper(Component):
+    _name = 'woo.sale.export.mapper'
+    _inherit = ['base.export.mapper']
+    _apply_on = 'woo.sale.order'
+
+    @mapping
+    def line_items(self, rec):
+        if rec:
+            line_items = []
+            binder = self.binder_for('woo.product.product')
+            for line in rec.order_line:
+                pass
+                line_items.append({
+                    'product_id': binder.to_backend(line.product_id.id, wrap=True),
+                    'quantity': line.product_qty,
+                    'total': str(line.price_subtotal),
+                })
+
+            return {'line_items': line_items}
+
+    @mapping
+    def customer_id(self, rec):
+        if rec:
+            binder = self.binder_for('woo.res.partner')
+            if rec.partner_id:
+                partner_id = binder.to_backend(rec.partner_id.id, wrap=True) or False
+                assert partner_id, ("Please Check Customer Role in WooCommerce")
+                return {'customer_id': partner_id}
+
+    @mapping
+    def backend_id(self, record):
+        return {'backend_id': self.backend_record.id}
+
+    @mapping
+    def openerp_id(self, rec):
+        return {'openerp_id': rec.id}

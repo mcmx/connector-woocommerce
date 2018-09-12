@@ -63,10 +63,13 @@
 							<button name="export_customers" type="object" class="oe_highlight"
 								string="Export in background" />
 						</group>
-						<group>
+						<group col="4">
                             <label string="Import Sale Orders" class="oe_inline" />
                             <button name="import_orders" type="object" class="oe_highlight"
                                 string="Import in background" />
+							<label string="Export Sale Orders" class="oe_inline" />
+                            <button name="export_orders" type="object" class="oe_highlight"
+                                string="Export in background" />
                         </group>
 					</sheet>
 				</form>
