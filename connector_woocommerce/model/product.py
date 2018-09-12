@@ -355,6 +355,10 @@ class ProductProductExportMapper(Component):
         return {'backend_id': self.backend_record.id}
 
     @mapping
+    def openerp_id(self, rec):
+        return {'openerp_id': rec.id}
+
+    @mapping
     def image(self, record):
         """Todo"""
         return

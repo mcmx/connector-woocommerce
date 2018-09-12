@@ -236,7 +236,7 @@ class CustomerExportMapper(Component):
         if record:
             return {'billing': {
                 'city': record.city,
-                'postcode': record.zip,
+                'postcode': record.zip or '',
                 'address_1': record.street,
                 'address_2': record.street2 or '',
                 'country': record.country_id.code,
@@ -246,3 +246,7 @@ class CustomerExportMapper(Component):
     @mapping
     def backend_id(self, record):
         return {'backend_id': self.backend_record.id}
+
+    @mapping
+    def openerp_id(self, rec):
+        return {'openerp_id': rec.id}
