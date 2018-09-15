@@ -19,7 +19,5 @@
 #
 #
 
-from . import connector
 from . import components
 from . import model
-from . import backend
