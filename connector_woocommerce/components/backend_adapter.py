@@ -18,18 +18,17 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-
 import logging
 import socket
+
+from odoo.addons.component.core import AbstractComponent
+from odoo.addons.connector.exception import NetworkRetryableError, RetryableJobError
+from woocommerce import API
+
 try:
     from xmlrpc import client as xmlrpclib
 except ImportError:
     import xmlrpclib
-
-from odoo.addons.component.core import AbstractComponent
-from odoo.addons.connector.exception import (NetworkRetryableError,
-                                             RetryableJobError)
-from woocommerce import API
 
 _logger = logging.getLogger(__name__)
 
@@ -138,8 +137,7 @@ class WooCRUDAdapter(AbstractComponent):
         """ Delete a record on the external system """
         raise NotImplementedError
 
-    # def _call(self, method, arguments):
-    def _call(self):
+    def _call(self, method, endpoint, data=None):
         try:
             # _logger.debug("Start calling Woocommerce api %s", method)
             api = API(
@@ -151,31 +149,26 @@ class WooCRUDAdapter(AbstractComponent):
                 timeout=None,
             )
             if api:
-                '''
-                Todo: 在实现对Woo的C、D、S、W后，再将重复的代码集中（抽象）到这里。
-                if isinstance(arguments, list):
-                    while arguments and arguments[-1] is None:
-                        arguments.pop()
-                start = datetime.now()
-                try:
-                    if 'false' or 'true' or 'null'in api.get(method).content:
-                        result = api.get(method).content.replace(
-                            'false', 'False')
-                        result = result.replace('true', 'True')
-                        result = result.replace('null', 'False')
-                        result = safe_eval(result)
-                    else:
-                        result = safe_eval(api.get(method).content)
-                except:
-                    _logger.error("api.call(%s, %s) failed", method, arguments)
-                    raise
+                if method == 'GET':
+                    r = api.get(endpoint)
+                elif method == 'POST':
+                    r = api.post(endpoint, data)
+                elif method == 'PUT':
+                    r = api.put(endpoint, data)
+                print(r.json(), data)
+                if r.status_code in [200, 201]:
+                    res = r.json()
+                    _logger.info(res)
+                    return r.json()
                 else:
-                    _logger.debug("api.call(%s, %s) returned %s in %s seconds",
-                                  method, arguments, result,
-                                  (datetime.now() - start).seconds)
-                return result
-                '''
-                return api
+                    if 'customers' in endpoint:
+                        code = r.json().get('code')
+                        if code == 'registration-error-email-exists':
+                            return self._call(method='GET', endpoint='customers?search=%s' % data.get('email'))[0]
+                        elif code == 'registration-error-invalid-email':
+                            return {'id': None}
+                        elif code == 'rest_missing_callback_param':
+                            return {'id': None}
         except (socket.gaierror, socket.error, socket.timeout) as err:
             raise NetworkRetryableError(
                 'A network error caused the failure of the job: '
@@ -222,9 +215,7 @@ class GenericAdapter(AbstractComponent):
             # attributes). The right correction is to install the
             # compatibility patch on WooCommerce.
             arguments.append(attributes)
-        r = self._call().get('%s/' % self._woo_model + str(id))
-        res = r.json()
-        _logger.info(res)
+        res = self._call(method='GET', endpoint='%s/' % self._woo_model + str(id))
         return res
 
     def search_read(self, filters=None):
@@ -238,14 +229,12 @@ class GenericAdapter(AbstractComponent):
             data['parent'] = data.get('woo_id_parent')
             del data['woo_id_parent']
 
-        res = self._call().post('%s' % self._woo_model, data).json()
-        _logger.info(res)
+        res = self._call(method='POST', endpoint='%s' % self._woo_model, data=data)
         return res
 
     def write(self, id, data):
         """ Update records on the external system """
-        res = self._call().put('%s/%s' % (self._woo_model, int(id)), data).json()
-        _logger.info(res)
+        res = self._call(method='PUT', endpoint='%s/%s' % (self._woo_model, int(id)), data=data)
         return res
 
     def delete(self, id):

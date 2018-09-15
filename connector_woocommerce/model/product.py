@@ -93,9 +93,9 @@ class ProductProductAdapter(Component):
         ids = []
         while True:
             page += 1
-            r = self._call().get('%s?page=%s' % (self._woo_model, page))
-            if r.json():
-                for product in r.json():
+            res = self._call(method='GET', endpoint='%s?page=%s' % (self._woo_model, page))
+            if res:
+                for product in res:
                     ids += [product.get('id')]
             else:
                 break

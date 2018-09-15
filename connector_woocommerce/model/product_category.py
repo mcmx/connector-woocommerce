@@ -82,8 +82,8 @@ class CategoryAdapter(Component):
             filters['updated_at']['to'] = to_date.strftime(dt_fmt)
 
         ids = []
-        r = self._call().get(self._woo_model)
-        for category in r.json():
+        res = self._call(method='GET', endpoint=self._woo_model)
+        for category in res:
             ids += [category.get('id')]
         return ids
 

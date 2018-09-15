@@ -74,8 +74,8 @@ class CustomerAdapter(Component):
             filters['updated_at']['to'] = to_date.strftime(dt_fmt)
 
         ids = []
-        r = self._call().get(self._woo_model)
-        for customer in r.json():
+        res = self._call(method='GET', endpoint=self._woo_model)
+        for customer in res:
             ids += [customer.get('id')]
         return ids
 
@@ -229,7 +229,7 @@ class CustomerExportMapper(Component):
     @mapping
     def email(self, record):
         if record:
-            return {'email': record.email or 'unknown@unknown.com'}
+            return {'email': record.email or ''}
 
     @mapping
     def billing_info(self, record):

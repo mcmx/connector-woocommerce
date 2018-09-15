@@ -164,9 +164,9 @@ class SaleOrderAdapter(Component):
         ids = []
         while True:
             page += 1
-            r = self._call().get('%s?page=%s' % (self._woo_model, page))
-            if r.json():
-                for saleorder in r.json():
+            res = self._call(method='GET', endpoint='%s?page=%s' % (self._woo_model, page))
+            if res:
+                for saleorder in res:
                     ids += [saleorder.get('id')]
             else:
                 break
