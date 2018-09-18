@@ -25,7 +25,7 @@ import platform
 from odoo.addons.component.core import AbstractComponent
 from odoo.addons.connector.exception import IDMissingInBackend
 
-from odoo import fields, _
+from odoo import _
 
 _logger = logging.getLogger(__name__)
 
@@ -131,7 +131,14 @@ class WooExporter(AbstractComponent):
         return
 
     def _get_woo_id(self):
-        return self.binder.to_backend(self.odoo_id, wrap=True)
+        binding = self.binder.to_backend(self.odoo_id, wrap=True)
+        if binding:
+            woo_id = binding.woo_id
+            if woo_id == self.work.component(usage='backend.adapter').read(woo_id).get('id'):
+                return woo_id
+            else:
+                binding.unlink()
+        return None
 
     def _create_data(self, map_record, **kwargs):
         return map_record.values(for_create=True, **kwargs)
@@ -149,12 +156,12 @@ class WooExporter(AbstractComponent):
     def _update_data(self, map_record, **kwargs):
         return map_record.values(**kwargs)
 
-    def _update(self, binding, data):
+    def _update(self, woo_id, data):
         """ Update an Woo record """
         # special check on data before export
         self._validate_data(data)
-        json = self.backend_adapter.write(binding, data)
-        _logger.debug('%d updated from odoo %s', binding, self.odoo_id)
+        self.backend_adapter.write(woo_id, data)
+        _logger.debug('%d updated from odoo %s', woo_id, self.odoo_id)
         return
 
     def _after_export(self, binding):

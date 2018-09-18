@@ -44,7 +44,7 @@ class WooBinding(models.AbstractModel):
         ondelete='restrict',
     )
     # fields.Char because 0 is a valid WooCommerce ID
-    woo_id = fields.Char(string='ID on Woo')
+    woo_id = fields.Integer(string='ID on Woo')
 
     _sql_constraints = [
         ('woo_uniq', 'unique(backend_id, woo_id)',

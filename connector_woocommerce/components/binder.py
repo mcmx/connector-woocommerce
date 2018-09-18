@@ -103,7 +103,7 @@ class WooModelBinder(Component):
             )
             if binding:
                 binding.ensure_one()
-                return binding.woo_id
+                return binding
             else:
                 return None
         if not record:

@@ -324,7 +324,7 @@ class ProductProductExportMapper(Component):
             woo_category_ids = []
             for odoo_category in odoo_categories:
                 odoo_category_id = odoo_category.id
-                woo_category_id = binder.to_backend(odoo_category_id, wrap=True)
+                woo_category_id = binder.to_backend(odoo_category_id, wrap=True).woo_id
                 if woo_category_id is None:
                     raise MappingError("The product category with "
                                        "odoo id %s is not exported." %

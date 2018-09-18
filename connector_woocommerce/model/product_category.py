@@ -221,7 +221,7 @@ class ProductCategoryExportMapper(Component):
             if not rec.parent_id:
                 return
             binder = self.binder_for()
-            woo_id_parent = binder.to_backend(rec.parent_id.id, wrap=True)
+            woo_id_parent = binder.to_backend(rec.parent_id.id, wrap=True).woo_id
             woo_parent_id = binder.to_openerp(external_id=woo_id_parent)
 
             return {'woo_id_parent': woo_id_parent, 'woo_parent_id': woo_parent_id}
