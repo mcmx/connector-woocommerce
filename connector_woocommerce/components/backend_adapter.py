@@ -139,7 +139,6 @@ class WooCRUDAdapter(AbstractComponent):
 
     def _call(self, method, endpoint, data=None):
         try:
-            # _logger.debug("Start calling Woocommerce api %s", method)
             api = API(
                 url=self.woo.location,
                 consumer_key=self.woo.consumer_key,
@@ -155,20 +154,33 @@ class WooCRUDAdapter(AbstractComponent):
                     r = api.post(endpoint, data)
                 elif method == 'PUT':
                     r = api.put(endpoint, data)
-                print(r.json(), data)
+
                 if r.status_code in [200, 201]:
                     res = r.json()
-                    _logger.info(res)
+                    _logger.info('%s: %s' % (endpoint, res))
                     return r.json()
                 else:
+                    code = r.json().get('code')
+                    message = r.json().get('message')
+                    _logger.info('%s: %s, %s' % (endpoint, code, message))
                     if 'customers' in endpoint:
-                        code = r.json().get('code')
                         if code == 'registration-error-email-exists':
                             return self._call(method='GET', endpoint='customers?search=%s' % data.get('email'))[0]
                         elif code == 'registration-error-invalid-email':
                             return {'id': None}
                         elif code == 'rest_missing_callback_param':
                             return {'id': None}
+                        elif code == 'woocommerce_rest_invalid_id':
+                            return {'id': None}
+                    elif 'products/categories' in endpoint:
+                        if code == 'term_exists':
+                            items = []
+                            for item in self._call(method='GET', endpoint='products/categories?search=%s' % data.get('name')):
+                                if item.get('name') == data.get('name') and data.get('parent', 0) == item.get('parent'):
+                                    items.append(item)
+
+                            return items[0]
+
         except (socket.gaierror, socket.error, socket.timeout) as err:
             raise NetworkRetryableError(
                 'A network error caused the failure of the job: '
