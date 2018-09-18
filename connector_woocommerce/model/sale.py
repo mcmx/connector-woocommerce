@@ -355,7 +355,7 @@ class SaleOrderLineExportMapper(Component):
     @mapping
     def product_id(self, record):
         binder = self.binder_for('woo.product.product')
-        product_id = binder.to_openerp(record['product_id'], unwrap=True)
+        product_id = binder.to_openerp(record['product_id'], unwrap=True).id
         assert product_id is not None, (
             "product_id %s should have been exported in "
             "SaleOrderExporter._export_dependencies" % record['product_id'])
@@ -363,7 +363,6 @@ class SaleOrderLineExportMapper(Component):
 
 
 class SaleOrderBatchExporter(Component):
-
     """ export the WooCommerce Partners.
 
     For every partner in the list, a delayed job is created.
@@ -375,17 +374,6 @@ class SaleOrderBatchExporter(Component):
     def update_existing_order(self, woo_sale_order, record_id):
         """ Enter Your logic for Existing Sale Order """
         return True
-
-    def run(self, filters=None):
-        """ Run the synchronization """
-        from_date = filters.pop('from_date', None)
-        to_date = filters.pop('to_date', None)
-        filters = []
-        record_ids = self.model.openerp_id.search(filters).ids
-        _logger.info('search for woo partners %s returned %s',
-                     filters, record_ids)
-        for record_id in record_ids:
-            self._export_record(record_id, priority=50)
 
 
 class SaleOrderExporter(Component):
@@ -455,7 +443,7 @@ class SaleOrderExportMapper(Component):
             for line in rec.order_line:
                 pass
                 line_items.append({
-                    'product_id': binder.to_backend(line.product_id.id, wrap=True),
+                    'product_id': binder.to_backend(line.product_id.id, wrap=True).id,
                     'quantity': line.product_qty,
                     'total': str(line.price_subtotal),
                 })
@@ -467,9 +455,9 @@ class SaleOrderExportMapper(Component):
         if rec:
             binder = self.binder_for('woo.res.partner')
             if rec.partner_id:
-                partner_id = binder.to_backend(rec.partner_id.id, wrap=True) or False
-                assert partner_id, ("Please Check Customer Role in WooCommerce")
-                return {'customer_id': partner_id}
+                partner = binder.to_backend(rec.partner_id.id, wrap=True) or False
+                assert partner, ("Please Check Customer Role in WooCommerce")
+                return {'customer_id': partner.woo_id}
 
     @mapping
     def backend_id(self, record):

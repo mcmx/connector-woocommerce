@@ -267,19 +267,6 @@ class ProductBatchExporter(Component):
     _inherit = ['woo.delayed.batch.exporter']
     _name = 'woo.product.batch.exporter'
 
-    def run(self, filters=None):
-        """ Run the synchronization """
-        from_date = filters.pop('from_date', None)
-        to_date = filters.pop('to_date', None)
-        if not filters:
-            filters = []
-
-        record_ids = self.model.openerp_id.search(filters).ids
-        _logger.info('search for woo Products %s returned %s',
-                     filters, record_ids)
-        for record_id in record_ids:
-            self._export_record(record_id, priority=30)
-
 
 class ProductProductExporter(Component):
     _name = 'woo.product.product.exporter'

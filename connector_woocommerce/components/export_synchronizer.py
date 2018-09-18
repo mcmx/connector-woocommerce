@@ -46,10 +46,6 @@ class WooExporter(AbstractComponent):
         self.odoo_id = None
         self.odoo_record = None
 
-    def _get_odoo_data(self):
-        """ Return the raw Odoo data for ``self.odoo_id`` """
-        return self.model.openerp_id.browse([self.odoo_id])
-
     def _before_export(self):
         """ Hook called before the export, when we have the Odoo
         data"""
@@ -168,16 +164,13 @@ class WooExporter(AbstractComponent):
         """ Hook called at the end of the export """
         return
 
-    def run(self, odoo_id, force=False):
+    def run(self, odoo_record, force=False):
         """ Run the synchronization
 
         :param odoo_id: identifier of the record on odooCommerce
         """
-        self.odoo_id = odoo_id
-        try:
-            self.odoo_record = self._get_odoo_data()
-        except IDMissingInBackend:
-            return _('Record does no longer exist in Odoo')
+        self.odoo_id = odoo_record.id
+        self.odoo_record = odoo_record
 
         skip = self._must_skip()
         if skip:
@@ -218,9 +211,12 @@ class BatchExporter(AbstractComponent):
 
     def run(self, filters=None):
         """ Run the synchronization """
-        record_ids = self.backend_adapter.search(filters)
-        for record_id in record_ids:
-            self._export_record(record_id)
+        if not filters:
+            filters = []
+        records = self.model.openerp_id.search(filters)
+        _logger.info('search for %s with %s returned %s', self.model.openerp_id._name, filters, records.ids)
+        for record in records:
+            self._export_record(record, priority=12)
 
     def _export_record(self, record_id):
         """ Export a record directly or delay the Export of the record.
@@ -236,9 +232,9 @@ class DelayedBatchExporter(AbstractComponent):
     _inherit = 'woo.batch.exporter'
     _name = 'woo.delayed.batch.exporter'
 
-    def _export_record(self, record_id, **kwargs):
+    def _export_record(self, record, **kwargs):
         """ Delay the export of the records"""
         if platform.system() == 'Linux':
-            self.model.with_delay().export_record(self.backend_record, record_id)
+            self.model.with_delay().export_record(self.backend_record, record)
         else:
-            self.model.export_record(self.backend_record, record_id)
+            self.model.export_record(self.backend_record, record)

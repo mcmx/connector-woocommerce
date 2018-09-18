@@ -188,25 +188,13 @@ class CustomerImportMapper(Component):
 
 
 class CustomerBatchExporter(Component):
-    """ Export the WooCommerce Partners.
+    """ Export the Odoo Partners.
 
     For every partner in the list, a delayed job is created.
     """
     _inherit = ['woo.delayed.batch.exporter']
     _name = 'woo.customer.batch.exporter'
     _apply_on = ['woo.res.partner']
-
-    def run(self, filters=None):
-        """ Run the synchronization """
-        from_date = filters.pop('from_date', None)
-        to_date = filters.pop('to_date', None)
-        if not filters:
-            filters = []
-        record_ids = self.model.openerp_id.search(filters).ids
-        _logger.info('search for woo partners %s returned %s',
-                     filters, record_ids)
-        for record_id in record_ids:
-            self._export_record(record_id, priority=40)
 
 
 class CustomerExporter(Component):
