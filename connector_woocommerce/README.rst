@@ -16,6 +16,7 @@ What's New
 
    * WooCommerce 2.6+.
    * WordPress 4.4+.
+#. Export data from WooCommerce then import them to Odoo, and vice versa.
 
 Known Issues
 ------------
