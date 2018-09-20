@@ -163,23 +163,33 @@ class WooCRUDAdapter(AbstractComponent):
                     code = r.json().get('code')
                     message = r.json().get('message')
                     _logger.info('%s: %s, %s' % (endpoint, code, message))
+                    err_res = {'id': None}
                     if 'customers' in endpoint:
-                        if code == 'registration-error-email-exists':
+                        if code == 'registration-error-email-exists' and method == 'POST':
                             return self._call(method='GET', endpoint='customers?search=%s' % data.get('email'))[0]
                         elif code == 'registration-error-invalid-email':
-                            return {'id': None}
+                            return err_res
                         elif code == 'rest_missing_callback_param':
-                            return {'id': None}
+                            return err_res
                         elif code == 'woocommerce_rest_invalid_id':
-                            return {'id': None}
+                            return err_res
                     elif 'products/categories' in endpoint:
-                        if code == 'term_exists':
+                        if code == 'term_exists' and method == 'POST':
                             items = []
                             for item in self._call(method='GET', endpoint='products/categories?search=%s' % data.get('name')):
                                 if item.get('name') == data.get('name') and data.get('parent', 0) == item.get('parent'):
                                     items.append(item)
 
                             return items[0]
+                        elif code == 'woocommerce_rest_term_invalid' and message == 'Resource does not exist.':
+                            return err_res
+                    elif 'products' in endpoint:
+                        if code == 'woocommerce_rest_product_invalid_id':
+                            return err_res
+                    elif 'orders' in endpoint:
+                        if code == 'woocommerce_rest_shop_order_invalid_id':
+                            return err_res
+
 
         except (socket.gaierror, socket.error, socket.timeout) as err:
             raise NetworkRetryableError(

@@ -55,7 +55,7 @@ class WooExporter(AbstractComponent):
         so it's unnecessary to coding a common func in there."""
         return False
 
-    def _export_dependency(self, odoo_id, binding_model,
+    def _export_dependency(self, odoo, binding_model,
                            exporter_class=None, always=False):
         """ Export a dependency.
 
@@ -78,14 +78,14 @@ class WooExporter(AbstractComponent):
                        yet exist.
         :type always: boolean
         """
-        if not odoo_id:
+        if not odoo:
             return
         if exporter_class is None:
             exporter_class = self._usage
         binder = self.binder_for(binding_model)
-        if always or binder.to_backend(odoo_id, wrap=True) is None:
+        if always or binder.to_backend(odoo, wrap=True) is None:
             exporter = self.component(usage=exporter_class, model_name=binding_model)
-            exporter.run(odoo_id)
+            exporter.run(odoo)
 
     def _export_dependencies(self):
         """ Export the dependencies for the record
@@ -129,11 +129,7 @@ class WooExporter(AbstractComponent):
     def _get_woo_id(self):
         binding = self.binder.to_backend(self.odoo_id, wrap=True)
         if binding:
-            woo_id = binding.woo_id
-            if woo_id == self.work.component(usage='backend.adapter').read(woo_id).get('id'):
-                return woo_id
-            else:
-                binding.unlink()
+            return binding.woo_id
         return None
 
     def _create_data(self, map_record, **kwargs):

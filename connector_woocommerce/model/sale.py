@@ -383,7 +383,7 @@ class SaleOrderExporter(Component):
 
     def _export_addresses(self):
         record = self.odoo_record
-        self._export_dependency(record.partner_id.id, 'woo.res.partner')
+        self._export_dependency(record.partner_id, 'woo.res.partner')
 
     def _export_dependencies(self):
         """ Export the dependencies for the record"""
@@ -394,7 +394,7 @@ class SaleOrderExporter(Component):
         for line in record:
             _logger.debug('line: %s', line)
             if line.product_id:
-                self._export_dependency(line.product_id.id, 'woo.product.product')
+                self._export_dependency(line.product_id, 'woo.product.product')
 
     def _clean_woo_items(self, resource):
         """

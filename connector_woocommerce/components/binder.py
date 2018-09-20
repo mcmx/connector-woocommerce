@@ -80,7 +80,7 @@ class WooModelBinder(Component):
             return bindings if browse else bindings.id
 
     def to_backend(self, record_id, wrap=False):
-        """ Give the external ID for an OpenERP ID
+        """ Get the valid external ID for an OpenERP ID
 
         :param record_id: OpenERP ID for which we want the external id
                           or a recordset with one record
@@ -103,9 +103,12 @@ class WooModelBinder(Component):
             )
             if binding:
                 binding.ensure_one()
-                return binding
-            else:
-                return None
+                woo_id = binding.woo_id
+                if woo_id == self.component(usage='backend.adapter', model_name=self.model._name).read(woo_id).get('id'):
+                    return binding
+                else:
+                    binding.unlink()
+            return None
         if not record:
             record = self.model.browse(record_id)
         assert record

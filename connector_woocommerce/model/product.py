@@ -277,7 +277,7 @@ class ProductProductExporter(Component):
         """ Export the dependencies for the record"""
         record = self.odoo_record
         for odoo_category in record.categ_id:
-            self._export_dependency(odoo_category.id, 'woo.product.category')
+            self._export_dependency(odoo_category, 'woo.product.category')
 
 
 class ProductProductExportMapper(Component):
