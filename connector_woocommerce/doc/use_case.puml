@@ -1,0 +1,50 @@
+@startuml
+:Odoo Admin: as Admin
+
+(Export data from Woo) as (EWoo)
+(Import data to Odoo) as (IOdoo)
+
+(Export <u>product category</u> form **Woo**\nthan import them to **Odoo** in batches) as (category w2o)
+(Export <u>product</u> form **Woo**\nthan import them to **Odoo** in batches) as (product w2o)
+(Export <u>custom</u> form **Woo**\nthan import them to **Odoo** in batches) as (custom w2o)
+(Export <u>sale order</u> form **Woo**\nthan import them to **Odoo** in batches) as (order w2o)
+
+(Export data from Odoo) as (EOdoo)
+(Import data to Woo) as (IWoo)
+
+(Export <u>product category</u> form **Odoo**\nthan import them to **Woo** in batches) as (category o2w)
+(Export <u>product</u> form **Odoo**\nthan import them to **Woo** in batches) as (product o2w)
+(Export <u>sale order</u> form **Odoo**\nthan import them to **Woo** in batches) as (order o2w)
+(Export <u>custom</u> form **Odoo**\nthan import them to **Woo** in batches) as (custom o2w)
+
+(category w2o) .up.> (EWoo) : <<include>>
+(product w2o) .up.> (EWoo) : <<include>>
+(custom w2o) .up.> (EWoo) : <<include>>
+(order w2o) .up.> (EWoo) : <<include>>
+(category w2o) .up.> (IOdoo) : <<include>>
+(product w2o) .up.> (IOdoo) : <<include>>
+(custom w2o) .up.> (IOdoo) : <<include>>
+(order w2o) .up.> (IOdoo) : <<include>>
+
+(category w2o) -down- Admin
+Admin -down- (category o2w)
+
+(product w2o) -down- Admin
+Admin -down- (product o2w)
+
+(custom w2o) -down- Admin
+Admin -down- (custom o2w)
+
+(order w2o) -down- Admin
+Admin -down- (order o2w)
+
+(EOdoo) <.up. (category o2w) : <<include>>
+(EOdoo) <.up. (product o2w) : <<include>>
+(EOdoo) <.up. (custom o2w) : <<include>>
+(EOdoo) <.up. (order o2w) : <<include>>
+(IWoo) <.up. (category o2w) : <<include>>
+(IWoo) <.up. (product o2w) : <<include>>
+(IWoo) <.up. (custom o2w) : <<include>>
+(IWoo) <.up. (order o2w) : <<include>>
+
+@enduml
