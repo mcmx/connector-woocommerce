@@ -1,0 +1,37 @@
+@startuml
+:Click **Import** Button<
+:Is Linux Platform?;
+if () then (Yes)
+  :Async Mode;
+else (No)
+  :Sync Mode;
+endif
+:Search Data form WooAPI;
+repeat
+:Read one record data;
+:**⋔** Write one record to Odoo;
+repeat while -> More Records
+->No More;
+stop
+
+partition Write_one_record_to_Odoo {
+  start
+  :Search Binding record;
+  if () then (Exist)
+    :Read Binding Record;
+  else (Non-Exist)
+  endif
+  :Before Import;
+  :Import Dependencies;
+  :Convert Data model\nfrom Woo to Odoo;
+  :Is Binding record exist?;
+  if () then (Yes)
+    :Modify Data in Odoo;
+  else (No)
+    :Insert Data to Odoo;
+  endif
+  :Checking the Binding Record;
+  :After Import;
+  stop
+}
+@enduml

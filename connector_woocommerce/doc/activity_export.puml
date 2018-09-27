@@ -1,0 +1,37 @@
+@startuml
+:Click **Export** Button<
+:Is Linux Platform?;
+if () then (Yes)
+  :Async Mode;
+else (No)
+  :Sync Mode;
+endif
+:Search Data form Odoo;
+repeat
+:Read one item data;
+:**⋔** Write one record to Woo;
+repeat while -> More Items
+->No More;
+stop
+
+partition Write_one_item_to_Woo {
+  start
+  :Search Binding Record;
+  if () then (Exist)
+    :Read Binding Record;
+  else (Non-Exist)
+  endif
+  :Before Export;
+  :Export Dependencies;
+  :Convert Data model\nfrom Odoo to Woo;
+  :Is Binding record exist?;
+  if () then (Yes)
+    :Modify Data in Woo;
+  else (No)
+    :Insert Data to Woo;
+  endif
+  :Checking the Binding Record;
+  :After Import;
+  stop
+}
+@enduml
