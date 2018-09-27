@@ -107,69 +107,59 @@ class wc_backend(models.Model):
             raise Warning(_('Test Success'))
         return True
 
+    def import_data(self, woo_model):
+        if platform.system() == 'Linux':
+            self.env[woo_model].with_delay().import_batch(self)
+        else:
+            self.env[woo_model].import_batch(self)
+        return True
+
+    def export_data(self, woo_model):
+        if platform.system() == 'Linux':
+            self.env[woo_model].with_delay().export_batch(self)
+        else:
+            self.env[woo_model].export_batch(self)
+        return True
+
     @api.multi
     def import_category(self):
-        if platform.system() == 'Linux':
-            self.env['woo.product.category'].with_delay().import_batch(self)
-        else:
-            self.env['woo.product.category'].import_batch(self)
-        return True
+        self.ensure_one()
+        return self.import_data('woo.product.category')
 
     @api.multi
     def export_category(self):
-        if platform.system() == 'Linux':
-            self.env['woo.product.category'].with_delay().export_batch(self)
-        else:
-            self.env['woo.product.category'].export_batch(self)
-        return True
+        self.ensure_one()
+        return self.export_data('woo.product.category')
 
     @api.multi
     def import_product(self):
-        if platform.system() == 'Linux':
-            self.env['woo.product.product'].with_delay().import_batch(self)
-        else:
-            self.env['woo.product.product'].import_batch(self)
-        return True
+        self.ensure_one()
+        return self.import_data('woo.product.product')
 
     @api.multi
     def export_product(self):
-        if platform.system() == 'Linux':
-            self.env['woo.product.product'].with_delay().export_batch(self)
-        else:
-            self.env['woo.product.product'].export_batch(self)
-        return True
+        self.ensure_one()
+        return self.export_data('woo.product.product')
 
     @api.multi
     def import_customer(self):
-        if platform.system() == 'Linux':
-            self.env['woo.res.partner'].with_delay().import_batch(self)
-        else:
-            self.env['woo.res.partner'].import_batch(self)
-        return True
+        self.ensure_one()
+        return self.import_data('woo.res.partner')
 
     @api.multi
     def export_customer(self):
-        if platform.system() == 'Linux':
-            self.env['woo.res.partner'].with_delay().export_batch(self)
-        else:
-            self.env['woo.res.partner'].export_batch(self)
-        return True
+        self.ensure_one()
+        return self.export_data('woo.res.partner')
 
     @api.multi
     def import_order(self):
-        if platform.system() == 'Linux':
-            self.env['woo.sale.order'].with_delay().import_batch(self)
-        else:
-            self.env['woo.sale.order'].import_batch(self)
-        return True
+        self.ensure_one()
+        return self.import_data('woo.sale.order')
 
     @api.multi
     def export_order(self):
-        if platform.system() == 'Linux':
-            self.env['woo.sale.order'].with_delay().export_batch(self)
-        else:
-            self.env['woo.sale.order'].export_batch(self)
-        return True
+        self.ensure_one()
+        return self.export_data('woo.sale.order')
 
     @api.multi
     def import_categories(self):
