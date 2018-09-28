@@ -10,7 +10,7 @@ endif
 repeat
 :Read one item data;
 :**⋔** Write one record to Woo;
-repeat while -> More Items
+repeat while -> More Records
 ->No More;
 stop
 

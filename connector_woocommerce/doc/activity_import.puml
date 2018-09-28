@@ -10,7 +10,7 @@ endif
 repeat
 :Read one record data;
 :**⋔** Write one record to Odoo;
-repeat while -> More Records
+repeat while -> More Items
 ->No More;
 stop
 
