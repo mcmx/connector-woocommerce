@@ -204,7 +204,7 @@ class SaleOrderBatchImporter(Component):
                 self.update_existing_order(woo_sale_order[0], record_id)
             else:
                 order_ids.append(record_id)
-        _logger.info('search for woo partners %s returned %s',
+        _logger.info('search for woo orders %s returned %s',
                      filters, record_ids)
         for record_id in order_ids:
             self._import_record(record_id, priority=50)
@@ -300,9 +300,10 @@ class SaleOrderImportMapper(Component):
                 assert partner_id, ("Please Check Customer Role \
                                     in WooCommerce")
                 result = {'partner_id': partner_id}
-                onchange_val = self.env['sale.order'].onchange_partner_id(
-                    partner_id)
-                result.update(onchange_val['value'])
+                #order = self.env['sale.order']
+                #order.partner_id = partner_id
+                #onchange_val = order.onchange_partner_id()
+                #result.update(onchange_val['value'])
             else:
                 customer = rec['billing']
                 country_id = False

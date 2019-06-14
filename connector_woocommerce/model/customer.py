@@ -102,7 +102,7 @@ class CustomerBatchImporter(Component):
         _logger.info('search for woo partners %s returned %s',
                      filters, record_ids)
         for record_id in record_ids:
-            self._import_record(record_id, 40)
+            self._import_record(record_id)
 
 
 class CustomerImporter(Component):
@@ -112,76 +112,100 @@ class CustomerImporter(Component):
 
 
 class CustomerImportMapper(Component):
-    _name = 'woo.costomer.import.mapper'
+    _name = 'woo.customer.import.mapper'
     _inherit = ['base.import.mapper']
     _apply_on = 'woo.res.partner'
 
     @mapping
     def name(self, record):
-            if record['customer']:
-                rec = record['customer']
-                return {'name': rec['first_name'] + " " + rec['last_name']}
+        return {'name': record['first_name'] + " " + record['last_name']}
 
     @mapping
     def email(self, record):
-        if record['customer']:
-                rec = record['customer']
-                return {'email': rec['email'] or None}
+        return {'email': record['email'] or None}
+
+    @mapping
+    def phone(self, record):
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            return {'phone': rec['phone'] or None}
 
     @mapping
     def city(self, record):
-        if record['customer']:
-                rec = record['customer']['billing_address']
-                return {'city': rec['city'] or None}
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            return {'city': rec['city'] or None}
 
     @mapping
     def zip(self, record):
-        if record['customer']:
-                rec = record['customer']['billing_address']
-                return {'zip': rec['postcode'] or None}
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            return {'zip': rec['postcode'] or None}
 
     @mapping
     def address(self, record):
-        if record['customer']:
-                rec = record['customer']['billing_address']
-                return {'street': rec['address_1'] or None}
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            return {'street': rec['address_1'] or None}
 
     @mapping
     def address_2(self, record):
-        if record['customer']:
-                rec = record['customer']['billing_address']
-                return {'street2': rec['address_2'] or None}
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            return {'street2': rec['address_2'] or None}
 
     @mapping
     def country(self, record):
-            if record['customer']:
-                rec = record['customer']['billing_address']
-                if rec['country']:
-                    country_id = self.env['res.country'].search(
-                        [('code', '=', rec['country'])])
-                    country_id = country_id.id
-                else:
-                    country_id = False
-                return {'country_id': country_id}
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            if rec['country']:
+                country_id = self.env['res.country'].search(
+                    [('code', '=', rec['country'])])
+                country_id = country_id.id
+            else:
+                country_id = False
+            return {'country_id': country_id}
 
     @mapping
     def state(self, record):
-            if record['customer']:
-                rec = record['customer']['billing_address']
-                if rec['state'] and rec['country']:
-                    state_id = self.env['res.country.state'].search(
-                        [('code', '=', rec['state'])])
-                    if not state_id:
-                        country_id = self.env['res.country'].search(
-                            [('code', '=', rec['country'])])
-                        state_id = self.env['res.country.state'].create(
-                            {'name': rec['state'],
-                             'code': rec['state'],
-                             'country_id': country_id.id})
+        if 'billing_address' in record:
+            rec = record['billing_address']
+        elif 'billing' in record:
+            rec = record['billing']
+        if rec:
+            if rec['state'] and rec['country']:
+                state_id = self.env['res.country.state'].search(
+                    [('code', '=', rec['state'])])
+                if not state_id:
+                    country_id = self.env['res.country'].search(
+                        [('code', '=', rec['country'])])
+                    #state_id = self.env['res.country.state'].create(
+                    #    {'name': rec['state'],
+                    #     'code': rec['state'],
+                    #     'country_id': country_id.id})
+                if state_id:
                     state_id = state_id.id or False
-                else:
-                    state_id = False
-                return {'state_id': state_id}
+            else:
+                state_id = False
+            return {'state_id': state_id}
 
     @mapping
     def backend_id(self, record):
